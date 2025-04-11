@@ -3,10 +3,10 @@ import pandas as pd
 import openai
 import os
 from dotenv import load_dotenv
-from sklearn.ensemble import RandomForestClassifier, IsolationForest
-from sklearn.svm import SVC
-from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, accuracy_score, precision_score, recall_score, f1_score
 import numpy as np
 
 st.set_page_config(page_title="Fraud Detector", layout="centered")
@@ -23,9 +23,6 @@ def load_data():
 
 data = load_data()
 
-# Display available columns for reference
-st.write("### Columns in uploaded data:", data.columns.tolist())
-
 # Preprocess
 categorical_cols = data.select_dtypes(include='object').columns
 label_encoders = {}
@@ -34,49 +31,45 @@ for col in categorical_cols:
     data[col] = le.fit_transform(data[col].astype(str))
     label_encoders[col] = le
 
-X = data.copy()
-y = np.zeros(len(data))  # Dummy placeholder for supervised learning pipeline
+# Assume the last column is the target (labeled fraud/no-fraud)
+target_col = data.columns[-1]  # adjust manually if needed
+y = data[target_col]
+X = data.drop(columns=[target_col])
+
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-# Train models without target (unsupervised or placeholder for consistency)
-rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
-svm_model = SVC(probability=True)
-xgb_model = None
-try:
-    import xgboost as xgb
-    xgb_model = xgb.XGBClassifier(use_label_encoder=False, eval_metric='logloss')
-except:
-    pass
-isolation_model = IsolationForest(contamination=0.05, random_state=42)
-
-rf_model.fit(X_train, y_train)
-svm_model.fit(X_train, y_train)
-if xgb_model:
-    xgb_model.fit(X_train, y_train)
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
 
 def predict_fraud(user_input):
     input_df = pd.DataFrame([user_input])
     for col in categorical_cols:
         if col in input_df:
             input_df[col] = label_encoders[col].transform(input_df[col].astype(str))
-    prediction = rf_model.predict(input_df)[0]
-    probability = rf_model.predict_proba(input_df)[0][1]
+    prediction = model.predict(input_df)[0]
+    probability = model.predict_proba(input_df)[0][1]
     return prediction, round(probability * 100, 2)
 
 questions = [
-    "Transaction ID:",
     "Transaction Amount:",
     "Transaction Type:",
-    "Origin Account Age:",
-    "Destination Account Age:",
-    "Customer Location:",
-    "Time of Transaction:",
-    "Previous Fraud History (Yes/No):"
+    "Account Age (Days):",
+    "Is this International? (Yes/No):",
+    "Time of Day:",
+    "Customer Age:",
+    "Branch Code:",
+    "Device ID:",
+    "Transaction Method:",
+    "Balance Before Transaction:",
+    "Balance After Transaction:",
+    "Login Attempts:",
+    "Transaction Duration (sec):"
 ]
 
 keys = [
-    "TransactionID", "Amount", "TransactionType", "OriginAccountAge",
-    "DestinationAccountAge", "Location", "TransactionTime", "FraudHistory"
+    "transaction_amount", "transaction_type", "account_age_days",
+    "is_international", "time_of_day", "customer_age", "branch_code",
+    "device_id", "transaction_method", "balance_before_transaction",
+    "balance_after_transaction", "login_attempts", "transaction_duration"
 ]
 
 if "question_index" not in st.session_state:
@@ -87,7 +80,7 @@ if "chat_log" not in st.session_state:
     st.session_state.chat_log = []
 
 st.markdown("## 🕵️ Fraud Detection Chatbot")
-st.markdown("Answer a few questions and get a fraud risk assessment:")
+st.markdown("Input values for a hypothetical transaction. The bot will assess fraud risk using past labeled data:")
 
 for message in st.session_state.chat_log:
     st.markdown(message, unsafe_allow_html=True)
