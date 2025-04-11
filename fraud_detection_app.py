@@ -16,8 +16,7 @@ DATA_PATH = "Banking Transactions Data For Fraud.xlsx"
 
 @st.cache_data
 def load_data():
-    df = pd.read_excel(DATA_PATH)
-    return df
+    return pd.read_excel(DATA_PATH)
 
 data = load_data()
 columns_to_drop = ["device_id", "transaction_id"]
@@ -44,8 +43,8 @@ def sanitize_numeric(value):
 
 def standardize_categoricals(user_input):
     if "is_international" in user_input:
-        user_input["is_international"] = user_input["is_international"].strip().lower()
-        user_input["is_international"] = "Yes" if user_input["is_international"] in ["yes", "y", "true", "1"] else "No"
+        val = user_input["is_international"].strip().lower()
+        user_input["is_international"] = "Yes" if val in ["yes", "y", "true", "1"] else "No"
     return user_input
 
 def predict_fraud(user_input):
@@ -60,21 +59,17 @@ def predict_fraud(user_input):
         if key in user_input:
             user_input[key] = sanitize_numeric(user_input[key])
 
-    input_df = pd.DataFrame([user_input])
-    
+    # Create full row with defaults for missing values
+    full_row = {col: user_input.get(col, 0 if col not in categorical_cols else 'Unknown') for col in X.columns}
+    input_df = pd.DataFrame([full_row])
+
     for col in categorical_cols:
         if col in input_df:
             try:
                 input_df[col] = label_encoders[col].transform(input_df[col].astype(str))
             except ValueError:
                 fallback = label_encoders[col].classes_[0]
-                input_df[col] = label_encoders[col].transform([fallback])[0]
-
-    input_df = input_df.reindex(columns=X.columns, fill_value=0)
-
-    non_numeric_cols = input_df.select_dtypes(exclude=[np.number]).columns
-    if len(non_numeric_cols) > 0:
-        raise ValueError(f"Non-numeric columns found: {non_numeric_cols.tolist()}")
+                input_df[col] = label_encoders[col].map(lambda x: fallback)
 
     input_df = input_df.astype(float)
     prediction = isolation_model.predict(input_df)[0]
