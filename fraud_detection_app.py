@@ -9,8 +9,12 @@ import numpy as np
 
 st.set_page_config(page_title="Fraud Detector", layout="centered")
 
+# Load API key from .env
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
+
+# For OpenAI v1 client
+client = openai.OpenAI()
 
 DATA_PATH = "Banking Transactions Data For Fraud.xlsx"
 
@@ -20,9 +24,11 @@ def load_data():
 
 data = load_data()
 
+# Drop unnecessary columns
 columns_to_drop = ["device_id", "transaction_id"]
 data = data.drop(columns=[col for col in columns_to_drop if col in data.columns])
 
+# Encode categorical columns
 categorical_cols = data.select_dtypes(include='object').columns
 label_encoders = {}
 for col in categorical_cols:
@@ -71,13 +77,11 @@ def predict_fraud(user_input):
                 fallback = label_encoders[col].classes_[0]
                 input_df[col] = [label_encoders[col].transform([fallback])[0]] * len(input_df)
         elif col == "is_international":
-            # Manual fallback encoding
             val = str(input_df[col].values[0]).strip().lower()
             input_df[col] = 1 if val in ["yes", "y", "true", "1"] else 0
 
     input_df = input_df.reindex(columns=X.columns, fill_value=0)
 
-    # Debug: Check for non-numeric columns
     non_numeric_cols = input_df.select_dtypes(exclude=["number"]).columns
     if len(non_numeric_cols) > 0:
         st.error(f"Cannot convert to float due to non-numeric data in: {list(non_numeric_cols)}")
@@ -158,7 +162,7 @@ with st.form("chat_form", clear_on_submit=True):
             "explain which behavioral and financial patterns may have contributed to this classification."
         )
 
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are a helpful fraud risk advisor who explains AI-based anomaly detection decisions."},
@@ -166,11 +170,10 @@ with st.form("chat_form", clear_on_submit=True):
             ]
         )
 
-        explanation = response["choices"][0]["message"]["content"]
+        explanation = response.choices[0].message.content
 
         st.markdown(f"### 🔍 Prediction: {result}")
         st.markdown(f"**Confidence:** {confidence}%")
         st.markdown("---")
         st.markdown("### 💡 Risk Assessment:")
         st.markdown(explanation)
-
