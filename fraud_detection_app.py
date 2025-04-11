@@ -22,6 +22,9 @@ def load_data():
 data = load_data()
 
 # Preprocess
+columns_to_drop = ["device_id", "transaction_id"]
+data = data.drop(columns=[col for col in columns_to_drop if col in data.columns])
+
 categorical_cols = data.select_dtypes(include='object').columns
 label_encoders = {}
 for col in categorical_cols:
@@ -54,6 +57,10 @@ def predict_fraud(user_input):
                 input_df[col] = label_encoders[col].transform(input_df[col].astype(str))
             except ValueError:
                 input_df[col] = label_encoders[col].transform([label_encoders[col].classes_[0]])[0]  # fallback to known class
+
+    # Ensure input matches training features
+    input_df = input_df.reindex(columns=X.columns, fill_value=0)
+
     prediction = isolation_model.predict(input_df)[0]
     result = 1 if prediction == -1 else 0  # -1 = anomaly (fraud)
     return result, round(np.random.uniform(75, 99), 2)  # simulated confidence
