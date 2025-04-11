@@ -45,7 +45,18 @@ def sanitize_numeric(value):
     except:
         return 0.0
 
+def standardize_categoricals(user_input):
+    if "is_international" in user_input:
+        user_input["is_international"] = user_input["is_international"].strip().lower()
+        if user_input["is_international"] in ["yes", "y", "true", "1"]:
+            user_input["is_international"] = "Yes"
+        else:
+            user_input["is_international"] = "No"
+    return user_input
+
 def predict_fraud(user_input):
+    user_input = standardize_categoricals(user_input)
+
     if "account_age_days" in user_input:
         user_input["account_age_days"] = sanitize_numeric(user_input["account_age_days"]) * 365
 
@@ -113,6 +124,8 @@ with st.form("chat_form", clear_on_submit=True):
             user_input = st.selectbox(prompt_text, ["Purchase", "Transfer", "Withdrawal", "Deposit"])
         elif "Transaction Method" in prompt_text:
             user_input = st.selectbox(prompt_text, ["Online", "In-Person", "Mobile", "ATM"])
+        elif "Is this International" in prompt_text:
+            user_input = st.selectbox(prompt_text, ["Yes", "No"])
         else:
             user_input = st.text_input(prompt_text)
 
