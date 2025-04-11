@@ -63,17 +63,21 @@ def predict_fraud(user_input):
     full_row = {col: user_input.get(col, 0 if col not in categorical_cols else "Unknown") for col in X.columns}
     input_df = pd.DataFrame([full_row])
 
-    for col in categorical_cols:
-        if col in input_df:
+    for col in X.columns:
+        if col in categorical_cols and col in input_df:
             try:
                 input_df[col] = label_encoders[col].transform(input_df[col].astype(str))
             except ValueError:
                 fallback = label_encoders[col].classes_[0]
                 input_df[col] = [label_encoders[col].transform([fallback])[0]] * len(input_df)
+        elif col == "is_international":
+            # Manual fallback encoding
+            val = str(input_df[col].values[0]).strip().lower()
+            input_df[col] = 1 if val in ["yes", "y", "true", "1"] else 0
 
     input_df = input_df.reindex(columns=X.columns, fill_value=0)
 
-    # Debug non-numeric conversion before casting
+    # Debug: Check for non-numeric columns
     non_numeric_cols = input_df.select_dtypes(exclude=["number"]).columns
     if len(non_numeric_cols) > 0:
         st.error(f"Cannot convert to float due to non-numeric data in: {list(non_numeric_cols)}")
@@ -169,3 +173,4 @@ with st.form("chat_form", clear_on_submit=True):
         st.markdown("---")
         st.markdown("### 💡 Risk Assessment:")
         st.markdown(explanation)
+
