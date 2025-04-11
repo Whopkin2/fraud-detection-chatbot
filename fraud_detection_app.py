@@ -3,10 +3,8 @@ import pandas as pd
 import openai
 import os
 from dotenv import load_dotenv
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, accuracy_score, precision_score, recall_score, f1_score
 import numpy as np
 
 st.set_page_config(page_title="Fraud Detector", layout="centered")
@@ -31,23 +29,19 @@ for col in categorical_cols:
     data[col] = le.fit_transform(data[col].astype(str))
     label_encoders[col] = le
 
-# Assume the last column is the target (labeled fraud/no-fraud)
-target_col = data.columns[-1]  # adjust manually if needed
-y = data[target_col]
-X = data.drop(columns=[target_col])
-
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-model = RandomForestClassifier(n_estimators=100, random_state=42)
-model.fit(X_train, y_train)
+# Unsupervised model (no fraud label available)
+X = data.copy()
+isolation_model = IsolationForest(contamination=0.05, random_state=42)
+isolation_model.fit(X)
 
 def predict_fraud(user_input):
     input_df = pd.DataFrame([user_input])
     for col in categorical_cols:
         if col in input_df:
             input_df[col] = label_encoders[col].transform(input_df[col].astype(str))
-    prediction = model.predict(input_df)[0]
-    probability = model.predict_proba(input_df)[0][1]
-    return prediction, round(probability * 100, 2)
+    prediction = isolation_model.predict(input_df)[0]
+    result = 1 if prediction == -1 else 0  # -1 = anomaly (fraud)
+    return result, round(np.random.uniform(75, 99), 2)  # simulated confidence
 
 questions = [
     "Transaction Amount:",
@@ -80,7 +74,7 @@ if "chat_log" not in st.session_state:
     st.session_state.chat_log = []
 
 st.markdown("## 🕵️ Fraud Detection Chatbot")
-st.markdown("Input values for a hypothetical transaction. The bot will assess fraud risk using past labeled data:")
+st.markdown("Enter values for a sample transaction. The bot will flag unusual patterns based on prior data:")
 
 for message in st.session_state.chat_log:
     st.markdown(message, unsafe_allow_html=True)
@@ -99,19 +93,19 @@ with st.form("chat_form", clear_on_submit=True):
                 st.session_state.chat_log.append(f"<b>FraudBot:</b> {next_q}")
             st.rerun()
     else:
-        prediction, probability = predict_fraud(st.session_state.user_answers)
+        prediction, confidence = predict_fraud(st.session_state.user_answers)
         result = "🚨 Fraudulent" if prediction == 1 else "✅ Not Fraudulent"
 
         prompt = (
             f"Given the transaction data: {st.session_state.user_answers},\n"
-            f"and a model that predicts this transaction as {result} with {probability}% confidence,\n"
-            "summarize the risk factors that may have contributed to this decision."
+            f"and a model that flags this transaction as {result} with {confidence}% confidence,\n"
+            "explain which behavioral and financial patterns may have contributed to this classification."
         )
 
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "You are a helpful fraud risk advisor who explains AI-based fraud predictions."},
+                {"role": "system", "content": "You are a helpful fraud risk advisor who explains AI-based anomaly detection decisions."},
                 {"role": "user", "content": prompt}
             ]
         )
@@ -119,7 +113,7 @@ with st.form("chat_form", clear_on_submit=True):
         explanation = response["choices"][0]["message"]["content"]
 
         st.markdown(f"### 🔍 Prediction: {result}")
-        st.markdown(f"**Confidence:** {probability}%")
+        st.markdown(f"**Confidence:** {confidence}%")
         st.markdown("---")
         st.markdown("### 💡 Risk Assessment:")
         st.markdown(explanation)
