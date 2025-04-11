@@ -50,7 +50,10 @@ def predict_fraud(user_input):
     input_df = pd.DataFrame([user_input])
     for col in categorical_cols:
         if col in input_df:
-            input_df[col] = label_encoders[col].transform(input_df[col].astype(str))
+            try:
+                input_df[col] = label_encoders[col].transform(input_df[col].astype(str))
+            except ValueError:
+                input_df[col] = label_encoders[col].transform([label_encoders[col].classes_[0]])[0]  # fallback to known class
     prediction = isolation_model.predict(input_df)[0]
     result = 1 if prediction == -1 else 0  # -1 = anomaly (fraud)
     return result, round(np.random.uniform(75, 99), 2)  # simulated confidence
