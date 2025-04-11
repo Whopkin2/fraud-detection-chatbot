@@ -20,8 +20,6 @@ def load_data():
     return df
 
 data = load_data()
-
-# Preprocess
 columns_to_drop = ["device_id", "transaction_id"]
 data = data.drop(columns=[col for col in columns_to_drop if col in data.columns])
 
@@ -32,7 +30,6 @@ for col in categorical_cols:
     data[col] = le.fit_transform(data[col].astype(str))
     label_encoders[col] = le
 
-# Unsupervised model (no fraud label available)
 X = data.copy()
 isolation_model = IsolationForest(contamination=0.05, random_state=42)
 isolation_model.fit(X)
@@ -48,10 +45,7 @@ def sanitize_numeric(value):
 def standardize_categoricals(user_input):
     if "is_international" in user_input:
         user_input["is_international"] = user_input["is_international"].strip().lower()
-        if user_input["is_international"] in ["yes", "y", "true", "1"]:
-            user_input["is_international"] = "Yes"
-        else:
-            user_input["is_international"] = "No"
+        user_input["is_international"] = "Yes" if user_input["is_international"] in ["yes", "y", "true", "1"] else "No"
     return user_input
 
 def predict_fraud(user_input):
@@ -59,7 +53,6 @@ def predict_fraud(user_input):
 
     if "account_age_days" in user_input:
         user_input["account_age_days"] = sanitize_numeric(user_input["account_age_days"]) * 365
-
     if "transaction_duration" in user_input:
         user_input["transaction_duration"] = sanitize_numeric(user_input["transaction_duration"]) * 60
 
@@ -68,14 +61,20 @@ def predict_fraud(user_input):
             user_input[key] = sanitize_numeric(user_input[key])
 
     input_df = pd.DataFrame([user_input])
+    
     for col in categorical_cols:
         if col in input_df:
             try:
                 input_df[col] = label_encoders[col].transform(input_df[col].astype(str))
             except ValueError:
-                input_df[col] = label_encoders[col].transform([label_encoders[col].classes_[0]])[0]
+                fallback = label_encoders[col].classes_[0]
+                input_df[col] = label_encoders[col].transform([fallback])[0]
 
     input_df = input_df.reindex(columns=X.columns, fill_value=0)
+
+    non_numeric_cols = input_df.select_dtypes(exclude=[np.number]).columns
+    if len(non_numeric_cols) > 0:
+        raise ValueError(f"Non-numeric columns found: {non_numeric_cols.tolist()}")
 
     input_df = input_df.astype(float)
     prediction = isolation_model.predict(input_df)[0]
