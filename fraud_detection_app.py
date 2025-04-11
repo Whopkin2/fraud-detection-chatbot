@@ -60,7 +60,6 @@ def predict_fraud(user_input):
         if key in user_input:
             user_input[key] = sanitize_numeric(user_input[key])
 
-    # Fill missing values with defaults
     full_row = {col: user_input.get(col, 0 if col not in categorical_cols else "Unknown") for col in X.columns}
     input_df = pd.DataFrame([full_row])
 
@@ -73,6 +72,14 @@ def predict_fraud(user_input):
                 input_df[col] = [label_encoders[col].transform([fallback])[0]] * len(input_df)
 
     input_df = input_df.reindex(columns=X.columns, fill_value=0)
+
+    # Debug non-numeric conversion before casting
+    non_numeric_cols = input_df.select_dtypes(exclude=["number"]).columns
+    if len(non_numeric_cols) > 0:
+        st.error(f"Cannot convert to float due to non-numeric data in: {list(non_numeric_cols)}")
+        st.write(input_df[non_numeric_cols])
+        return 0, 0
+
     input_df = input_df.astype(float)
 
     prediction = isolation_model.predict(input_df)[0]
