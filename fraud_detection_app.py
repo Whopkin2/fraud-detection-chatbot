@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[ ]:
-
-
 import streamlit as st
 import pandas as pd
 import openai
@@ -21,9 +15,8 @@ st.set_page_config(page_title="Fraud Detector", layout="centered")
 
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
-client = openai.OpenAI(api_key=openai.api_key)
 
-DATA_PATH = r"C:\\Users\\willh\\OneDrive\\Documents\\BIA 662\\fraud_detection_chatbot\\Banking Transactions Data For Fraud.xlsx"
+DATA_PATH = "Banking Transactions Data For Fraud.xlsx"
 
 @st.cache_data
 def load_data():
@@ -138,7 +131,7 @@ with st.form("chat_form", clear_on_submit=True):
             "summarize the risk factors that may have contributed to this decision."
         )
 
-        response = client.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are a helpful fraud risk advisor who explains AI-based fraud predictions."},
@@ -146,7 +139,7 @@ with st.form("chat_form", clear_on_submit=True):
             ]
         )
 
-        explanation = response.choices[0].message.content
+        explanation = response["choices"][0]["message"]["content"]
 
         st.markdown(f"### 🔍 Prediction: {result}")
         st.markdown(f"**Confidence:** {probability}%")
