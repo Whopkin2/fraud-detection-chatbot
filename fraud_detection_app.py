@@ -37,18 +37,24 @@ X = data.copy()
 isolation_model = IsolationForest(contamination=0.05, random_state=42)
 isolation_model.fit(X)
 
+def sanitize_numeric(value):
+    if isinstance(value, str):
+        value = value.replace("$", "").replace(",", "").strip()
+    try:
+        return float(value)
+    except:
+        return 0.0
+
 def predict_fraud(user_input):
     if "account_age_days" in user_input:
-        try:
-            user_input["account_age_days"] = float(user_input["account_age_days"]) * 365
-        except:
-            pass
+        user_input["account_age_days"] = sanitize_numeric(user_input["account_age_days"]) * 365
 
     if "transaction_duration" in user_input:
-        try:
-            user_input["transaction_duration"] = float(user_input["transaction_duration"]) * 60  # convert minutes to seconds
-        except:
-            pass
+        user_input["transaction_duration"] = sanitize_numeric(user_input["transaction_duration"]) * 60
+
+    for key in ["transaction_amount", "balance_before_transaction", "balance_after_transaction", "customer_age", "login_attempts"]:
+        if key in user_input:
+            user_input[key] = sanitize_numeric(user_input[key])
 
     input_df = pd.DataFrame([user_input])
     for col in categorical_cols:
@@ -56,14 +62,13 @@ def predict_fraud(user_input):
             try:
                 input_df[col] = label_encoders[col].transform(input_df[col].astype(str))
             except ValueError:
-                input_df[col] = label_encoders[col].transform([label_encoders[col].classes_[0]])[0]  # fallback to known class
+                input_df[col] = label_encoders[col].transform([label_encoders[col].classes_[0]])[0]
 
-    # Ensure input matches training features
     input_df = input_df.reindex(columns=X.columns, fill_value=0)
 
     prediction = isolation_model.predict(input_df)[0]
-    result = 1 if prediction == -1 else 0  # -1 = anomaly (fraud)
-    return result, round(np.random.uniform(75, 99), 2)  # simulated confidence
+    result = 1 if prediction == -1 else 0
+    return result, round(np.random.uniform(75, 99), 2)
 
 questions = [
     "Transaction Amount:",
