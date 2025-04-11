@@ -35,6 +35,18 @@ isolation_model = IsolationForest(contamination=0.05, random_state=42)
 isolation_model.fit(X)
 
 def predict_fraud(user_input):
+    if "account_age_days" in user_input:
+        try:
+            user_input["account_age_days"] = float(user_input["account_age_days"]) * 365
+        except:
+            pass
+
+    if "transaction_duration" in user_input:
+        try:
+            user_input["transaction_duration"] = float(user_input["transaction_duration"]) * 60  # convert minutes to seconds
+        except:
+            pass
+
     input_df = pd.DataFrame([user_input])
     for col in categorical_cols:
         if col in input_df:
@@ -45,24 +57,23 @@ def predict_fraud(user_input):
 
 questions = [
     "Transaction Amount:",
-    "Transaction Type:",
-    "Account Age (Days):",
+    "Transaction Type (e.g., Purchase, Transfer, Withdrawal):",
+    "Account Age (Years):",
     "Is this International? (Yes/No):",
     "Time of Day:",
     "Customer Age:",
-    "Branch Code:",
-    "Device ID:",
-    "Transaction Method:",
+    "Branch Code (BR001–BR004):",
+    "Transaction Method (e.g., Online, In-Person, Mobile):",
     "Balance Before Transaction:",
     "Balance After Transaction:",
     "Login Attempts:",
-    "Transaction Duration (sec):"
+    "Transaction Duration (minutes):"
 ]
 
 keys = [
     "transaction_amount", "transaction_type", "account_age_days",
     "is_international", "time_of_day", "customer_age", "branch_code",
-    "device_id", "transaction_method", "balance_before_transaction",
+    "transaction_method", "balance_before_transaction",
     "balance_after_transaction", "login_attempts", "transaction_duration"
 ]
 
@@ -81,7 +92,15 @@ for message in st.session_state.chat_log:
 
 with st.form("chat_form", clear_on_submit=True):
     if st.session_state.question_index < len(questions):
-        user_input = st.text_input(questions[st.session_state.question_index])
+        prompt_text = questions[st.session_state.question_index]
+
+        if "Transaction Type" in prompt_text:
+            user_input = st.selectbox(prompt_text, ["Purchase", "Transfer", "Withdrawal", "Deposit"])
+        elif "Transaction Method" in prompt_text:
+            user_input = st.selectbox(prompt_text, ["Online", "In-Person", "Mobile", "ATM"])
+        else:
+            user_input = st.text_input(prompt_text)
+
         submitted = st.form_submit_button("Send")
         if submitted and user_input:
             key = keys[st.session_state.question_index]
