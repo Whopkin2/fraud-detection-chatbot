@@ -77,6 +77,7 @@ def predict_fraud(user_input):
 
     input_df = input_df.reindex(columns=X.columns, fill_value=0)
 
+    input_df = input_df.astype(float)
     prediction = isolation_model.predict(input_df)[0]
     result = 1 if prediction == -1 else 0
     return result, round(np.random.uniform(75, 99), 2)
