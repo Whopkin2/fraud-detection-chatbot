@@ -19,6 +19,7 @@ def load_data():
     return pd.read_excel(DATA_PATH)
 
 data = load_data()
+
 columns_to_drop = ["device_id", "transaction_id"]
 data = data.drop(columns=[col for col in columns_to_drop if col in data.columns])
 
@@ -59,8 +60,8 @@ def predict_fraud(user_input):
         if key in user_input:
             user_input[key] = sanitize_numeric(user_input[key])
 
-    # Create full row with defaults for missing values
-    full_row = {col: user_input.get(col, 0 if col not in categorical_cols else 'Unknown') for col in X.columns}
+    # Fill missing values with defaults
+    full_row = {col: user_input.get(col, 0 if col not in categorical_cols else "Unknown") for col in X.columns}
     input_df = pd.DataFrame([full_row])
 
     for col in categorical_cols:
@@ -69,9 +70,11 @@ def predict_fraud(user_input):
                 input_df[col] = label_encoders[col].transform(input_df[col].astype(str))
             except ValueError:
                 fallback = label_encoders[col].classes_[0]
-                input_df[col] = label_encoders[col].map(lambda x: fallback)
+                input_df[col] = [label_encoders[col].transform([fallback])[0]] * len(input_df)
 
+    input_df = input_df.reindex(columns=X.columns, fill_value=0)
     input_df = input_df.astype(float)
+
     prediction = isolation_model.predict(input_df)[0]
     result = 1 if prediction == -1 else 0
     return result, round(np.random.uniform(75, 99), 2)
