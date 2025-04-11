@@ -1,0 +1,8 @@
+streamlit
+pandas
+openai
+python-dotenv
+scikit-learn
+xgboost
+numpy
+Pillow
