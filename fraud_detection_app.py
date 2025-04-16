@@ -91,9 +91,9 @@ def predict_fraud(user_input):
     user_input = standardize_categoricals(user_input)
 
     if "account_age_days" in user_input:
-    user_input["account_age_days"] = sanitize_numeric(user_input["account_age_days"]) * 365  # convert years to days
+        user_input["account_age_days"] = sanitize_numeric(user_input["account_age_days"]) * 365  # convert years to days
     if "transaction_duration" in user_input:
-    user_input["transaction_duration"] = sanitize_numeric(user_input["transaction_duration"]) * 60  # convert minutes to seconds
+        user_input["transaction_duration"] = sanitize_numeric(user_input["transaction_duration"]) * 60  # convert minutes to seconds
 
     for key in ["transaction_amount", "balance_before_transaction", "balance_after_transaction", "customer_age", "login_attempts"]:
         if key in user_input:
