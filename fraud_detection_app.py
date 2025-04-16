@@ -14,7 +14,7 @@ import seaborn as sns
 
 st.set_page_config(page_title="Fraud Detector", layout="centered")
 
-# Load API and Email config
+# Load environment variables
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
@@ -26,12 +26,8 @@ def load_data():
     return pd.read_excel(DATA_PATH)
 
 data = load_data()
+data = data.drop(columns=["transaction_id", "device_id", "branch_code"])
 
-# Drop identifier columns
-columns_to_drop = ["transaction_id", "device_id", "branch_code"]
-data = data.drop(columns=columns_to_drop)
-
-# Encode categorical variables
 categorical_cols = data.select_dtypes(include=['object', 'bool']).columns
 label_encoders = {}
 for col in categorical_cols:
@@ -40,17 +36,13 @@ for col in categorical_cols:
     label_encoders[col] = le
 
 X = data.copy()
-
-# Train Isolation Forest
 isolation_model = IsolationForest(contamination=0.05, random_state=42)
 isolation_model.fit(X)
 
-# Prepare scored data
 X_scored = X.copy()
 X_scored["anomaly_score"] = isolation_model.decision_function(X)
 X_scored["is_fraud"] = isolation_model.predict(X)
 
-# Behavioral Clustering
 kmeans = KMeans(n_clusters=4, random_state=42)
 X_scored["behavior_cluster"] = kmeans.fit_predict(X)
 
@@ -71,7 +63,8 @@ def standardize_categoricals(user_input):
 def send_email_alert(to_email, subject, message):
     sender_email = os.getenv("ALERT_SENDER_EMAIL")
     sender_password = os.getenv("ALERT_SENDER_PASSWORD")
-    smtp_server = "smtp.gmail.com"
+    admin_email = os.getenv("ALERT_ADMIN_EMAIL")
+    smtp_server = "smtp.mail.yahoo.com"
     smtp_port = 587
     msg = MIMEText(message)
     msg["Subject"] = subject
@@ -82,8 +75,8 @@ def send_email_alert(to_email, subject, message):
         with smtplib.SMTP(smtp_server, smtp_port) as server:
             server.starttls()
             server.login(sender_email, sender_password)
-            server.sendmail(sender_email, to_email, msg.as_string())
-            st.success("Email alert sent!")
+            server.sendmail(sender_email, [to_email, admin_email], msg.as_string())
+            st.success("Email alert sent to account owner and admin.")
     except Exception as e:
         st.error(f"Email alert failed: {e}")
 
@@ -129,27 +122,22 @@ with st.form("user_input_form"):
     st.markdown("### Enter transaction data below:")
     user_input = {}
     for col in X.columns:
+        label = f"{col.replace('_', ' ').capitalize()} (numeric):"
         if col in categorical_cols:
-            example = ""
+            label = col.replace('_', ' ').capitalize()
             if col == "transaction_type":
-                options = ["payment", "transfer", "withdrawal", "deposit"]
-                example = f" (e.g., {' / '.join(options)})"
+                label += " (e.g., payment / transfer / withdrawal / deposit)"
             elif col == "time_of_day":
-                options = ["morning", "afternoon", "evening", "night"]
-                example = f" (e.g., {' / '.join(options)})"
+                label += " (e.g., morning / afternoon / evening / night)"
             elif col == "transaction_method":
-                options = ["online", "in-person", "mobile", "ATM", "swipe"]
-                example = f" (e.g., {' / '.join(options)})"
+                label += " (e.g., online / ATM / swipe / in-person)"
             elif col == "is_international":
-                example = " (Yes or No)"
-            user_input[col] = st.text_input(f"{col.replace('_', ' ').capitalize()} {example}")
-        else:
-            label = f"{col.replace('_', ' ').capitalize()} (numeric):"
-            if col == "account_age_days":
-                label = "Account age (in years):"
-            if col == "transaction_duration":
-                label = "Transaction duration (in minutes):"
-            user_input[col] = st.text_input(label)
+                label += " (Yes or No)"
+        if col == "account_age_days":
+            label = "Account age (in years):"
+        elif col == "transaction_duration":
+            label = "Transaction duration (in minutes):"
+        user_input[col] = st.text_input(label)
 
     submitted = st.form_submit_button("Analyze Transaction")
 
@@ -166,9 +154,10 @@ if submitted:
         2: "High-risk profile – frequent anomalies in timing, value, or method of transactions.",
         3: "New or rarely active users, with erratic behavior patterns and sparse history."
     }
-    explanation_text = cluster_descriptions.get(behavior_cluster, "Unknown pattern cluster.")
-    st.markdown(f"**Behavioral Cluster:** {behavior_cluster} – {explanation_text}")
+    cluster_info = cluster_descriptions.get(behavior_cluster, "Unknown pattern cluster.")
+    st.markdown(f"**Behavioral Cluster:** {behavior_cluster} – {cluster_info}")
 
+    # GPT Explanation
     prompt = f"""
 Given the transaction data: {user_input},
 and a model that flagged it as {result} with fraud score {fraud_score},
@@ -178,7 +167,6 @@ consider if it was a withdrawal from a new account, or a less risky deposit.
 Assess transaction size, account age, login attempts, and transaction duration,
 and explain how these factors influence the model's decision.
 """
-
     response = client.chat.completions.create(
         model="gpt-4",
         messages=[
@@ -192,22 +180,32 @@ and explain how these factors influence the model's decision.
     st.markdown("### Risk Assessment Explanation:")
     st.markdown(f"<div style='font-family: Arial; font-size: 15px'>{explanation}</div>", unsafe_allow_html=True)
 
-    # Move email entry AFTER explanation
     if fraud_score > 60:
-        user_email = st.text_input("⚠️ High fraud risk detected. Enter your email to receive an alert:")
-        if user_email:
+        st.markdown("---")
+        st.markdown("### 📧 Notify Account Owner")
+        user_email = st.text_input("Enter the account owner's email to notify them about this suspicious transaction:")
+        send_alert = st.button("Send Alert Email")
+
+        if send_alert and user_email:
+            transaction_details = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in user_input.items()])
             send_email_alert(
                 to_email=user_email,
-                subject="Urgent: Potential Fraud Detected on Your Account",
+                subject="⚠️ Fraud Alert: Suspicious Transaction Detected",
                 message=(
-                    f"""Potential fraud has been detected on your account.
+                    f"""A transaction has been flagged as potentially fraudulent with a risk score of {fraud_score:.2f}%.
 
-Our system flagged a suspicious transaction with a fraud likelihood score of {fraud_score:.2f}%.
+Behavioral Cluster: {behavior_cluster} – {cluster_info}
+
+Reason for Detection (AI Risk Analysis):
+{explanation}
+
+Transaction Details:
+{transaction_details}
 
 Recommended Actions:
 - Immediately verify this transaction.
-- Contact your financial institution if it seems unauthorized.
-- Monitor your account activity closely over the next few days."""
+- Contact your financial institution if this activity seems unauthorized.
+- Monitor account activity over the next few days."""
                 )
             )
 
@@ -223,4 +221,4 @@ Recommended Actions:
     feature_corrs = heatmap_data.corr()['anomaly_score'].drop('anomaly_score')
     for feat, val in feature_corrs.items():
         direction = "increases" if val > 0 else "decreases"
-        st.markdown(f"**{feat.replace('_', ' ').capitalize()}** has a correlation of `{val:.2f}`, which means higher values in this feature {direction} the likelihood of being flagged as fraud.")
+        st.markdown(f"**{feat.replace('_', ' ').capitalize()}** has a correlation of `{val:.2f}`, meaning higher values in this feature {direction} the likelihood of fraud.")
