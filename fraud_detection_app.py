@@ -5,17 +5,23 @@ import os
 from dotenv import load_dotenv
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import LabelEncoder
+from sklearn.cluster import KMeans
 import numpy as np
+import smtplib
+from email.mime.text import MIMEText
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 st.set_page_config(page_title="Fraud Detector", layout="centered")
 
-# Load API key from .env
+# Load API key and email config from .env
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# For OpenAI v1 client
+# OpenAI client
 client = openai.OpenAI()
 
+# Load dataset
 DATA_PATH = "Banking Transactions Data For Fraud.xlsx"
 
 @st.cache_data
@@ -36,9 +42,17 @@ for col in categorical_cols:
     data[col] = le.fit_transform(data[col].astype(str))
     label_encoders[col] = le
 
+# Modeling
 X = data.copy()
 isolation_model = IsolationForest(contamination=0.05, random_state=42)
 isolation_model.fit(X)
+X["anomaly_score"] = isolation_model.decision_function(X)
+X["is_fraud"] = isolation_model.predict(X)
+
+# KMeans clustering
+num_clusters = 4
+kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+X["behavior_cluster"] = kmeans.fit_predict(X)
 
 def sanitize_numeric(value):
     if isinstance(value, str):
@@ -54,6 +68,26 @@ def standardize_categoricals(user_input):
         user_input["is_international"] = "Yes" if val in ["yes", "y", "true", "1"] else "No"
     return user_input
 
+def send_email_alert(to_email, subject, message):
+    sender_email = os.getenv("ALERT_SENDER_EMAIL")
+    sender_password = os.getenv("ALERT_SENDER_PASSWORD")
+    smtp_server = "smtp.gmail.com"
+    smtp_port = 587
+
+    msg = MIMEText(message)
+    msg["Subject"] = subject
+    msg["From"] = sender_email
+    msg["To"] = to_email
+
+    try:
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.sendmail(sender_email, to_email, msg.as_string())
+            st.success("🚨 Email alert sent!")
+    except Exception as e:
+        st.error(f"Email alert failed: {e}")
+
 def predict_fraud(user_input):
     user_input = standardize_categoricals(user_input)
 
@@ -66,34 +100,30 @@ def predict_fraud(user_input):
         if key in user_input:
             user_input[key] = sanitize_numeric(user_input[key])
 
-    full_row = {col: user_input.get(col, 0 if col not in categorical_cols else "Unknown") for col in X.columns}
+    full_row = {col: user_input.get(col, 0 if col not in categorical_cols else "Unknown") for col in X.columns if col not in ["anomaly_score", "is_fraud", "behavior_cluster"]}
     input_df = pd.DataFrame([full_row])
 
-    for col in X.columns:
-        if col in categorical_cols and col in input_df:
+    for col in input_df.columns:
+        if col in categorical_cols:
             try:
                 input_df[col] = label_encoders[col].transform(input_df[col].astype(str))
             except ValueError:
                 fallback = label_encoders[col].classes_[0]
-                input_df[col] = [label_encoders[col].transform([fallback])[0]] * len(input_df)
+                input_df[col] = [label_encoders[col].transform([fallback])[0]]
         elif col == "is_international":
             val = str(input_df[col].values[0]).strip().lower()
             input_df[col] = 1 if val in ["yes", "y", "true", "1"] else 0
 
-    input_df = input_df.reindex(columns=X.columns, fill_value=0)
-
-    non_numeric_cols = input_df.select_dtypes(exclude=["number"]).columns
-    if len(non_numeric_cols) > 0:
-        st.error(f"Cannot convert to float due to non-numeric data in: {list(non_numeric_cols)}")
-        st.write(input_df[non_numeric_cols])
-        return 0, 0
-
     input_df = input_df.astype(float)
+    input_df = input_df.reindex(columns=X.columns.drop(["anomaly_score", "is_fraud", "behavior_cluster"]), fill_value=0)
 
     prediction = isolation_model.predict(input_df)[0]
+    fraud_score = round(abs(isolation_model.decision_function(input_df)[0]), 2)
+    behavior_cluster = kmeans.predict(input_df)[0]
     result = 1 if prediction == -1 else 0
-    return result, round(np.random.uniform(75, 99), 2)
+    return result, fraud_score, behavior_cluster
 
+# Questions
 questions = [
     "Transaction Amount:",
     "Transaction Type (e.g., Purchase, Transfer, Withdrawal):",
@@ -116,6 +146,7 @@ keys = [
     "balance_after_transaction", "login_attempts", "transaction_duration"
 ]
 
+# Session
 if "question_index" not in st.session_state:
     st.session_state.question_index = 0
 if "user_answers" not in st.session_state:
@@ -153,12 +184,19 @@ with st.form("chat_form", clear_on_submit=True):
                 st.session_state.chat_log.append(f"<b>FraudBot:</b> {next_q}")
             st.rerun()
     else:
-        prediction, confidence = predict_fraud(st.session_state.user_answers)
+        prediction, fraud_score, behavior_cluster = predict_fraud(st.session_state.user_answers)
         result = "🚨 Fraudulent" if prediction == 1 else "✅ Not Fraudulent"
+
+        if prediction == 1:
+            send_email_alert(
+                to_email="your_recipient@example.com",
+                subject="⚠️ Fraud Alert: Suspicious Transaction Detected",
+                message=f"A potentially fraudulent transaction was flagged:\n\n{st.session_state.user_answers}\n\nFraud Score: {fraud_score}"
+            )
 
         prompt = (
             f"Given the transaction data: {st.session_state.user_answers},\n"
-            f"and a model that flags this transaction as {result} with {confidence}% confidence,\n"
+            f"and a model that flags this transaction as {result} with fraud score {fraud_score},\n"
             "explain which behavioral and financial patterns may have contributed to this classification."
         )
 
@@ -173,7 +211,18 @@ with st.form("chat_form", clear_on_submit=True):
         explanation = response.choices[0].message.content
 
         st.markdown(f"### 🔍 Prediction: {result}")
-        st.markdown(f"**Confidence:** {confidence}%")
+        st.markdown(f"**Fraud Score:** {fraud_score}")
+        st.markdown(f"**Behavioral Cluster:** {behavior_cluster}")
         st.markdown("---")
         st.markdown("### 💡 Risk Assessment:")
         st.markdown(explanation)
+
+        # Anomaly Heatmap
+        top_features = X.drop(columns=["anomaly_score", "is_fraud", "behavior_cluster"]).corrwith(X["anomaly_score"]).abs().sort_values(ascending=False).head(10).index
+        heatmap_data = X[top_features].copy()
+        heatmap_data["anomaly_score"] = X["anomaly_score"]
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+        sns.heatmap(heatmap_data.corr(), annot=True, cmap="coolwarm", ax=ax)
+        ax.set_title("🔍 Anomaly Score Heatmap (Top Correlated Features)")
+        st.pyplot(fig)
