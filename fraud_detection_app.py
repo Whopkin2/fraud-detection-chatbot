@@ -15,8 +15,8 @@ import seaborn as sns
 st.set_page_config(page_title="Fraud Detector", layout="centered")
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
-
 client = openai.OpenAI()
+
 DATA_PATH = "Banking Transactions Data For Fraud.xlsx"
 
 @st.cache_data
@@ -67,7 +67,7 @@ def standardize_categoricals(user_input):
         user_input["is_international"] = "Yes" if val in ["yes", "y", "true", "1"] else "No"
     return user_input
 
-# ✅ UPDATED GMAIL EMAIL SENDER FUNCTION
+# ✅ GMAIL EMAIL FUNCTION
 def send_email_alert(to_email, subject, message):
     try:
         sender_email = os.getenv("EMAIL_USER")
@@ -91,11 +91,13 @@ def send_email_alert(to_email, subject, message):
         st.error(f"❌ Email alert failed: {e}")
         return False
 
-# Persistent session state
+# 🔁 Session state
 if "submitted" not in st.session_state:
     st.session_state.submitted = False
 if "result_data" not in st.session_state:
     st.session_state.result_data = {}
+if "email_sent" not in st.session_state:
+    st.session_state.email_sent = False
 
 st.markdown("## 🕵️ Fraud Detection Chatbot")
 
@@ -185,13 +187,21 @@ if st.session_state.submitted:
     st.markdown(f"**Fraud Score:** {d['fraud_score']}%")
 
     cluster_map = {
-        0: "Cluster 0: Very low-risk behavior. Transactions are stable and consistent.",
-        1: "Cluster 1: Mildly irregular patterns. Occasionally high or delayed transactions.",
-        2: "Cluster 2: High alert. This cluster includes frequent or unusually timed high-value actions.",
-        3: "Cluster 3: New or minimal history accounts. Risk inferred due to sparse data or erratic behavior."
+        0: "Low-risk cluster with consistent behavior and established transaction patterns.",
+        1: "Mildly irregular cluster — moderate risk with some timing/amount deviations.",
+        2: "High-alert cluster with frequent large or off-hour transactions.",
+        3: "Erratic behavior cluster. Sparse history or unusual patterns — often seen in new or suspicious accounts."
     }
-    st.markdown(f"**Behavioral Cluster:** {d['behavior_cluster']} – {cluster_map.get(d['behavior_cluster'], 'Unknown cluster')} ")
 
+    if d['result'] == "Fraudulent" and d['fraud_score'] > 60:
+        cluster_explanation = (
+            f"{cluster_map.get(d['behavior_cluster'], 'Unknown cluster')} "
+            f"However, this transaction was flagged as fraudulent, indicating a risk spike not typical for this profile."
+        )
+    else:
+        cluster_explanation = cluster_map.get(d['behavior_cluster'], 'Unknown cluster')
+
+    st.markdown(f"**Behavioral Cluster:** {d['behavior_cluster']} – {cluster_explanation}")
     st.markdown("### Explanation:")
     st.markdown(d['explanation'])
 
@@ -210,15 +220,15 @@ if st.session_state.submitted:
         direction = "increases" if val > 0 else "decreases"
         st.markdown(f"- **{feat.replace('_', ' ').capitalize()}** has a correlation of `{val:.2f}`, meaning higher values {direction} fraud risk.")
 
-    if d['fraud_score'] > 60 and d['email']:
-        if st.button("📧 Send Email Alert"):
-            tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
-            email_sent = send_email_alert(
-                to_email=d['email'],
-                subject="⚠️ Fraud Alert: Suspicious Transaction Detected",
-                message=f"""⚠️ A transaction was flagged with a fraud score of {d['fraud_score']}%.
+    # 🚨 Send email once automatically
+    if d['fraud_score'] > 60 and d['email'] and not st.session_state.email_sent:
+        tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
+        email_sent = send_email_alert(
+            to_email=d['email'],
+            subject="WARNING: Fraud Alert – Suspicious Transaction Detected",
+            message=f"""A transaction was flagged with a fraud score of {d['fraud_score']}%.
 
-Behavioral Cluster: {d['behavior_cluster']} – {cluster_map.get(d['behavior_cluster'], 'Unknown cluster')}
+Behavioral Cluster: {d['behavior_cluster']} – {cluster_explanation}
 
 Reason for Detection:
 {d['explanation']}
@@ -229,7 +239,10 @@ Transaction Details:
 Recommended Actions:
 - Verify this transaction
 - Contact your bank if unauthorized
-- Monitor account activity for anomalies."""
-            )
-            if email_sent:
-                st.success("✅ Alert sent to account owner and admin.")
+- Monitor account activity immediately."""
+        )
+        if email_sent:
+            st.success("✅ Alert sent to account owner and admin.")
+            st.session_state.email_sent = True
+        else:
+            st.error("❌ Email failed to send.")
