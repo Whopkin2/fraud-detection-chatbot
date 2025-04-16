@@ -1,9 +1,8 @@
 streamlit
 pandas
 openai
-python-dotenv
 scikit-learn
 matplotlib
 seaborn
-numpy
-xlrd
+python-dotenv
+openpyxl
