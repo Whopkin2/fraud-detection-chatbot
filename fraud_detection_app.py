@@ -10,6 +10,7 @@ import numpy as np
 import smtplib
 from email.mime.text import MIMEText
 import matplotlib.pyplot as plt
+import re
 
 st.set_page_config(page_title="Fraud Detector", layout="centered")
 load_dotenv()
@@ -39,7 +40,7 @@ for col in categorical_cols:
 features = [
     "transaction_amount", "is_international", "transaction_method", "time_of_day",
     "account_age_days", "login_attempts", "balance_before_transaction",
-    "balance_after_transaction", "transaction_duration",
+    "balance_after_transaction", "transaction_duration", "customer_age",
     "is_negative_balance_after", "is_late_night"
 ]
 X = data[features]
@@ -62,17 +63,33 @@ def sanitize_numeric(value):
     except:
         return 0.0
 
-def parse_account_age(text):
+def extract_number(text):
     try:
-        text = text.lower()
-        if "month" in text:
-            return sanitize_numeric(text) * 30
-        elif "year" in text:
-            return sanitize_numeric(text) * 365
-        else:
-            return sanitize_numeric(text)
+        num = float(re.search(r"\d*\.?\d+", str(text)).group())
+        return num
     except:
-        return 1
+        return 0.0
+
+def parse_account_age(text):
+    text = str(text).lower()
+    num = extract_number(text)
+    if "month" in text:
+        return num * 30
+    elif "year" in text:
+        return num * 365
+    return num  # already in days
+
+def parse_transaction_duration(text):
+    text = str(text).lower()
+    num = extract_number(text)
+    if "second" in text:
+        return num / 60
+    elif "hour" in text:
+        return num * 60
+    return num  # already in minutes
+
+def parse_customer_age(text):
+    return extract_number(text)
 
 def parse_yes_no(value):
     return 1 if str(value).strip().lower() in ['yes', 'y', 'true', '1'] else 0
@@ -138,7 +155,9 @@ with st.form("user_input_form"):
             if col == "account_age_days":
                 label = "Account age (e.g., '12 months' or '2 years')"
             elif col == "transaction_duration":
-                label = "Transaction duration (in minutes)"
+                label = "Transaction duration (e.g., '3 minutes' or '2 hours')"
+            elif col == "customer_age":
+                label = "Customer age (e.g., '24 years')"
             else:
                 label += " (numeric)"
         user_input[col] = st.text_input(label, key=col)
@@ -149,8 +168,10 @@ with st.form("user_input_form"):
 if submitted:
     user_input = standardize_categoricals(user_input)
     user_input["account_age_days"] = parse_account_age(user_input.get("account_age_days", "1 year"))
-    user_input["transaction_duration"] = sanitize_numeric(user_input.get("transaction_duration", "1")) * 60
-    for k in ["transaction_amount", "balance_before_transaction", "balance_after_transaction", "customer_age", "login_attempts"]:
+    user_input["transaction_duration"] = parse_transaction_duration(user_input.get("transaction_duration", "1 minute"))
+    user_input["customer_age"] = parse_customer_age(user_input.get("customer_age", "18"))
+
+    for k in ["transaction_amount", "balance_before_transaction", "balance_after_transaction", "login_attempts"]:
         user_input[k] = sanitize_numeric(user_input.get(k, "0"))
 
     user_input["is_negative_balance_after"] = parse_yes_no(user_input.get("is_negative_balance_after", "No"))
@@ -170,7 +191,7 @@ if submitted:
 
     prediction = isolation_model.predict(input_df)[0]
     raw_score = isolation_model.decision_function(input_df)[0]
-    fraud_score = round((1 - raw_score) * 100, 2)
+    fraud_score = round((-raw_score) * 100, 2)  # Corrected logic
     behavior_cluster = int(kmeans.predict(input_df)[0])
     result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
 
