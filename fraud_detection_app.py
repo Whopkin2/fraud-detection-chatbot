@@ -127,7 +127,23 @@ with st.form("user_input_form"):
     user_input = {}
     for col in X.columns:
         if col in categorical_cols:
-            user_input[col] = st.text_input(f"{col}:")
+            if col == "transaction_type":
+                options = ["payment", "transfer", "withdrawal", "deposit"]
+                example = f" (e.g., {' / '.join(options)})"
+            elif col == "time_of_day":
+                options = ["morning", "afternoon", "evening", "night"]
+                example = f" (e.g., {' / '.join(options)})"
+            elif col == "branch_code":
+                options = ["BR001", "BR002", "BR003", "BR004"]
+                example = f" (e.g., {' / '.join(options)})"
+            elif col == "transaction_method":
+                options = ["online", "in-person", "mobile", "ATM", "swipe"]
+                example = f" (e.g., {' / '.join(options)})"
+            elif col == "is_international":
+                example = " (Yes or No)"
+            else:
+                example = ""
+            user_input[col] = st.text_input(f"{col}:{example}")
         else:
             user_input[col] = st.text_input(f"{col} (numeric):")
 
