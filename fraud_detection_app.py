@@ -10,7 +10,6 @@ import numpy as np
 import smtplib
 from email.mime.text import MIMEText
 import matplotlib.pyplot as plt
-import seaborn as sns
 
 st.set_page_config(page_title="Fraud Detector", layout="centered")
 load_dotenv()
@@ -56,11 +55,11 @@ def parse_account_age(text):
     try:
         text = text.lower()
         if "month" in text:
-            return sanitize_numeric(text) / 12 * 365
+            return sanitize_numeric(text) * 30
         elif "year" in text:
             return sanitize_numeric(text) * 365
         else:
-            return sanitize_numeric(text) * 365
+            return sanitize_numeric(text)  # fallback to days
     except:
         return 1
 
@@ -72,7 +71,7 @@ def standardize_categoricals(user_input):
 
 def send_email_alert(to_email, subject, message):
     try:
-        sender_email = os.getenv("EMAIL_USER")
+        sender_email = os.getenv("ALERT_SENDER_EMAIL")
         sender_password = os.getenv("EMAIL_PASS")
         admin_email = os.getenv("ALERT_ADMIN_EMAIL")
         smtp_server = "smtp.gmail.com"
@@ -87,7 +86,6 @@ def send_email_alert(to_email, subject, message):
         msg["To"] = to_email
 
         with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.set_debuglevel(1)
             server.starttls()
             server.login(sender_email, sender_password)
             server.sendmail(sender_email, [to_email, admin_email], msg.as_string())
@@ -104,10 +102,10 @@ if "result_data" not in st.session_state:
 if "email_sent" not in st.session_state:
     st.session_state.email_sent = False
 
-st.markdown("## 🕵️ Fraud Detection Chatbot")
+st.markdown("## 🕵️ <span style='font-family: Arial;'>Fraud Detection Chatbot</span>", unsafe_allow_html=True)
 
 with st.form("user_input_form"):
-    st.markdown("### Enter transaction data:")
+    st.markdown("### <span style='font-family: Arial;'>Enter transaction data:</span>", unsafe_allow_html=True)
     user_input = {}
     for col in X.columns:
         label = col.replace('_', ' ').capitalize()
@@ -122,9 +120,9 @@ with st.form("user_input_form"):
                 label += " (Yes or No)"
         else:
             if col == "account_age_days":
-                label = "Account age (e.g., '12 months' or '2 years'):"
+                label = "Account age (e.g., '12 months' or '2 years')"
             elif col == "transaction_duration":
-                label = "Transaction duration (in minutes):"
+                label = "Transaction duration (in minutes)"
             else:
                 label += " (numeric)"
         user_input[col] = st.text_input(label, key=col)
@@ -186,7 +184,7 @@ and explain how these factors influence the model's decision.
 
 if st.session_state.submitted:
     d = st.session_state.result_data
-    st.markdown(f"### Prediction: **{d['result']}**")
+    st.markdown(f"### <span style='font-family: Arial;'>Prediction: <strong>{d['result']}</strong></span>", unsafe_allow_html=True)
     st.markdown(f"**Fraud Score:** {d['fraud_score']}%")
 
     cluster_map = {
@@ -213,14 +211,12 @@ if st.session_state.submitted:
         top_input_features = d['input_df'].iloc[0].sort_values(ascending=False).head(5)
         for feat, val in top_input_features.items():
             st.markdown(f"- **{feat.replace('_', ' ').capitalize()}**: `{val:.2f}`")
-    else:
-        st.warning("⚠️ Could not compute top input features — input data may be invalid.")
 
-    if d['fraud_score'] > 60 and d['email'] and not st.session_state.email_sent:
+    if d['fraud_score'] > 75 and d['email'] and not st.session_state.email_sent:
         tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
         email_sent = send_email_alert(
             to_email=d['email'],
-            subject="WARNING: Fraud Alert – Suspicious Transaction Detected",
+            subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
             message=f"""A transaction was flagged with a fraud score of {d['fraud_score']}%.
 
 Behavioral Cluster: {d['behavior_cluster']} – {cluster_explanation}
