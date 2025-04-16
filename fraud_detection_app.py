@@ -130,22 +130,18 @@ with st.form("user_input_form"):
     user_input = {}
     for col in X.columns:
         if col in categorical_cols:
+            example = ""
             if col == "transaction_type":
                 options = ["payment", "transfer", "withdrawal", "deposit"]
                 example = f" (e.g., {' / '.join(options)})"
             elif col == "time_of_day":
                 options = ["morning", "afternoon", "evening", "night"]
                 example = f" (e.g., {' / '.join(options)})"
-            elif col == "branch_code":
-                options = ["BR001", "BR002", "BR003", "BR004"]
-                example = f" (e.g., {' / '.join(options)})"
             elif col == "transaction_method":
                 options = ["online", "in-person", "mobile", "ATM", "swipe"]
                 example = f" (e.g., {' / '.join(options)})"
             elif col == "is_international":
                 example = " (Yes or No)"
-            else:
-                example = ""
             user_input[col] = st.text_input(f"{col.replace('_', ' ').capitalize()} {example}")
         else:
             label = f"{col.replace('_', ' ').capitalize()} (numeric):"
@@ -163,25 +159,15 @@ if submitted:
 
     st.markdown(f"### Prediction: {result}")
     st.markdown(f"**Fraud Score:** {fraud_score}% likelihood of fraud")
-    st.markdown(f"**Behavioral Cluster:** {behavior_cluster}")
 
-    if fraud_score > 60:
-        user_email = st.text_input("Enter your email to receive a fraud alert:")
-        if user_email:
-            send_email_alert(
-                to_email=user_email,
-                subject="Urgent: Potential Fraud Detected on Your Account",
-                message=(
-                    f"""Potential fraud has been detected on your account.
-
-Our system flagged a suspicious transaction with a fraud likelihood score of {fraud_score:.2f}%.
-
-Recommended Actions:
-- Immediately verify this transaction.
-- Contact your financial institution if it seems unauthorized.
-- Monitor your account activity closely over the next few days."""
-                )
-            )
+    cluster_descriptions = {
+        0: "Typical low-risk users with consistent behavior and predictable transaction patterns.",
+        1: "Slightly irregular users with moderate risk – may include infrequent large transactions or odd login times.",
+        2: "High-risk profile – frequent anomalies in timing, value, or method of transactions.",
+        3: "New or rarely active users, with erratic behavior patterns and sparse history."
+    }
+    explanation_text = cluster_descriptions.get(behavior_cluster, "Unknown pattern cluster.")
+    st.markdown(f"**Behavioral Cluster:** {behavior_cluster} – {explanation_text}")
 
     prompt = f"""
 Given the transaction data: {user_input},
@@ -206,6 +192,25 @@ and explain how these factors influence the model's decision.
     st.markdown("### Risk Assessment Explanation:")
     st.markdown(f"<div style='font-family: Arial; font-size: 15px'>{explanation}</div>", unsafe_allow_html=True)
 
+    # Move email entry AFTER explanation
+    if fraud_score > 60:
+        user_email = st.text_input("⚠️ High fraud risk detected. Enter your email to receive an alert:")
+        if user_email:
+            send_email_alert(
+                to_email=user_email,
+                subject="Urgent: Potential Fraud Detected on Your Account",
+                message=(
+                    f"""Potential fraud has been detected on your account.
+
+Our system flagged a suspicious transaction with a fraud likelihood score of {fraud_score:.2f}%.
+
+Recommended Actions:
+- Immediately verify this transaction.
+- Contact your financial institution if it seems unauthorized.
+- Monitor your account activity closely over the next few days."""
+                )
+            )
+
     top_features = X_scored.drop(columns=["anomaly_score", "is_fraud", "behavior_cluster"]).corrwith(X_scored["anomaly_score"]).abs().sort_values(ascending=False).head(10).index
     heatmap_data = X_scored[top_features].copy()
     heatmap_data["anomaly_score"] = X_scored["anomaly_score"]
@@ -214,6 +219,7 @@ and explain how these factors influence the model's decision.
     sns.heatmap(heatmap_data.corr(), annot=True, cmap="coolwarm", ax=ax)
     ax.set_title("Anomaly Score Heatmap (Top Correlated Features)")
     st.pyplot(fig)
+
     feature_corrs = heatmap_data.corr()['anomaly_score'].drop('anomaly_score')
     for feat, val in feature_corrs.items():
         direction = "increases" if val > 0 else "decreases"
