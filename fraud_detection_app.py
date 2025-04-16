@@ -229,7 +229,8 @@ if st.session_state.submitted:
         for feat, val in top_input_features.items():
             st.markdown(f"- **{feat.replace('_', ' ').capitalize()}**: `{val:.2f}`")
 
-    if d['fraud_score'] > 75 and d['email'] and not st.session_state.email_sent:
+    # ✅ FINAL FIX: Email sent only if it's fraudulent AND score > 75%
+    if d['result'] == "Fraudulent" and d['fraud_score'] > 75 and d['email'] and not st.session_state.email_sent:
         tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
         email_sent = send_email_alert(
             to_email=d['email'],
