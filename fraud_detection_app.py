@@ -83,7 +83,7 @@ def send_email_alert(to_email, subject, message):
             server.starttls()
             server.login(sender_email, sender_password)
             server.sendmail(sender_email, to_email, msg.as_string())
-            st.success("\ud83d\udea8 Email alert sent!")
+            st.success("Email alert sent!")
     except Exception as e:
         st.error(f"Email alert failed: {e}")
 
@@ -120,7 +120,7 @@ def predict_fraud(user_input):
     return result, fraud_score, behavior_cluster
 
 # UI Setup
-st.markdown("## \ud83d\udd75\ufe0f Fraud Detection Chatbot")
+st.markdown("## Fraud Detection Chatbot")
 
 with st.form("user_input_form"):
     st.markdown("### Enter transaction data below:")
@@ -135,16 +135,16 @@ with st.form("user_input_form"):
 
 if submitted:
     prediction, fraud_score, behavior_cluster = predict_fraud(user_input)
-    result = "\ud83d\udea8 Fraudulent" if prediction == 1 else "\u2705 Not Fraudulent"
+    result = "Fraudulent" if prediction == 1 else "Not Fraudulent"
 
     if prediction == 1:
         send_email_alert(
             to_email="your_recipient@example.com",
-            subject="\u26a0\ufe0f Fraud Alert",
+            subject="Fraud Alert",
             message=f"Potential fraud detected:\n\n{user_input}\n\nFraud Score: {fraud_score}"
         )
 
-    st.markdown(f"### \ud83d\udd0d Prediction: {result}")
+    st.markdown(f"### Prediction: {result}")
     st.markdown(f"**Fraud Score:** {fraud_score}")
     st.markdown(f"**Behavioral Cluster:** {behavior_cluster}")
 
@@ -164,7 +164,7 @@ if submitted:
     explanation = response.choices[0].message.content
 
     st.markdown("---")
-    st.markdown("### \ud83d\udca1 Risk Assessment Explanation:")
+    st.markdown("### Risk Assessment Explanation:")
     st.markdown(explanation)
 
     top_features = X_scored.drop(columns=["anomaly_score", "is_fraud", "behavior_cluster"]).corrwith(X_scored["anomaly_score"]).abs().sort_values(ascending=False).head(10).index
@@ -173,5 +173,5 @@ if submitted:
 
     fig, ax = plt.subplots(figsize=(10, 6))
     sns.heatmap(heatmap_data.corr(), annot=True, cmap="coolwarm", ax=ax)
-    ax.set_title("\ud83d\udd0d Anomaly Score Heatmap (Top Correlated Features)")
+    ax.set_title("Anomaly Score Heatmap (Top Correlated Features)")
     st.pyplot(fig)
