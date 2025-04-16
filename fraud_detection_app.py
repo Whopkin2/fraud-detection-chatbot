@@ -44,7 +44,6 @@ X_scored["is_fraud"] = isolation_model.predict(X)
 kmeans = KMeans(n_clusters=4, random_state=42)
 X_scored["behavior_cluster"] = kmeans.fit_predict(X)
 
-
 def sanitize_numeric(value):
     if isinstance(value, str):
         value = value.replace("$", "").replace(",", "").strip()
@@ -52,7 +51,6 @@ def sanitize_numeric(value):
         return float(value)
     except:
         return 0.0
-
 
 def parse_account_age(text):
     text = text.lower()
@@ -63,20 +61,19 @@ def parse_account_age(text):
     else:
         return sanitize_numeric(text) * 365
 
-
 def standardize_categoricals(user_input):
     if "is_international" in user_input:
         val = user_input["is_international"].strip().lower()
         user_input["is_international"] = "Yes" if val in ["yes", "y", "true", "1"] else "No"
     return user_input
 
-
+# ✅ UPDATED GMAIL EMAIL SENDER FUNCTION
 def send_email_alert(to_email, subject, message):
     try:
-        sender_email = os.getenv("ALERT_SENDER_EMAIL")
-        sender_password = os.getenv("ALERT_SENDER_PASSWORD")
+        sender_email = os.getenv("EMAIL_USER")
+        sender_password = os.getenv("EMAIL_PASS")
         admin_email = os.getenv("ALERT_ADMIN_EMAIL")
-        smtp_server = "smtp.mail.yahoo.com"
+        smtp_server = "smtp.gmail.com"
         smtp_port = 587
 
         msg = MIMEText(message)
@@ -88,9 +85,10 @@ def send_email_alert(to_email, subject, message):
             server.starttls()
             server.login(sender_email, sender_password)
             server.sendmail(sender_email, [to_email, admin_email], msg.as_string())
+
         return True
     except Exception as e:
-        st.error(f"Email alert failed: {e}")
+        st.error(f"❌ Email alert failed: {e}")
         return False
 
 # Persistent session state
@@ -234,4 +232,4 @@ Recommended Actions:
 - Monitor account activity for anomalies."""
             )
             if email_sent:
-                st.success("Alert sent to account owner and admin.")
+                st.success("✅ Alert sent to account owner and admin.")
