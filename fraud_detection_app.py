@@ -53,13 +53,16 @@ def sanitize_numeric(value):
         return 0.0
 
 def parse_account_age(text):
-    text = text.lower()
-    if "month" in text:
-        return sanitize_numeric(text) / 12 * 365
-    elif "year" in text:
-        return sanitize_numeric(text) * 365
-    else:
-        return sanitize_numeric(text) * 365
+    try:
+        text = text.lower()
+        if "month" in text:
+            return sanitize_numeric(text) / 12 * 365
+        elif "year" in text:
+            return sanitize_numeric(text) * 365
+        else:
+            return sanitize_numeric(text) * 365  # assume years if no unit
+    except:
+        return 1  # default to 1 day if missing or error
 
 def standardize_categoricals(user_input):
     if "is_international" in user_input:
@@ -67,7 +70,6 @@ def standardize_categoricals(user_input):
         user_input["is_international"] = "Yes" if val in ["yes", "y", "true", "1"] else "No"
     return user_input
 
-# ✅ GMAIL EMAIL FUNCTION
 def send_email_alert(to_email, subject, message):
     try:
         sender_email = os.getenv("EMAIL_USER")
@@ -76,12 +78,16 @@ def send_email_alert(to_email, subject, message):
         smtp_server = "smtp.gmail.com"
         smtp_port = 587
 
+        if not sender_email or not sender_password or not admin_email:
+            raise Exception("Missing environment variables for email.")
+
         msg = MIMEText(message)
         msg["Subject"] = subject
         msg["From"] = sender_email
         msg["To"] = to_email
 
         with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.set_debuglevel(1)
             server.starttls()
             server.login(sender_email, sender_password)
             server.sendmail(sender_email, [to_email, admin_email], msg.as_string())
@@ -91,7 +97,7 @@ def send_email_alert(to_email, subject, message):
         st.error(f"❌ Email alert failed: {e}")
         return False
 
-# 🔁 Session state
+# Session state
 if "submitted" not in st.session_state:
     st.session_state.submitted = False
 if "result_data" not in st.session_state:
@@ -129,13 +135,10 @@ with st.form("user_input_form"):
 
 if submitted:
     user_input = standardize_categoricals(user_input)
-    user_input["account_age_days"] = parse_account_age(user_input.get("account_age_days", "0"))
-    if user_input["account_age_days"] == 0 and user_input.get("transaction_type", "").lower() == "deposit":
-        user_input["account_age_days"] = 1
-
-    user_input["transaction_duration"] = sanitize_numeric(user_input.get("transaction_duration", 0)) * 60
+    user_input["account_age_days"] = parse_account_age(user_input.get("account_age_days", "1 year"))
+    user_input["transaction_duration"] = sanitize_numeric(user_input.get("transaction_duration", "1")) * 60
     for k in ["transaction_amount", "balance_before_transaction", "balance_after_transaction", "customer_age", "login_attempts"]:
-        user_input[k] = sanitize_numeric(user_input.get(k, 0))
+        user_input[k] = sanitize_numeric(user_input.get(k, "0"))
 
     full_row = {col: user_input.get(col, 0 if col not in categorical_cols else "Unknown") for col in X.columns}
     input_df = pd.DataFrame([full_row])
@@ -205,22 +208,11 @@ if st.session_state.submitted:
     st.markdown("### Explanation:")
     st.markdown(d['explanation'])
 
-    top_features = X_scored.drop(columns=["anomaly_score", "is_fraud", "behavior_cluster"]).corrwith(X_scored["anomaly_score"]).abs().sort_values(ascending=False).head(10).index
-    heatmap_data = X_scored[top_features].copy()
-    heatmap_data["anomaly_score"] = X_scored["anomaly_score"]
+    st.markdown("### 🔍 Key Feature Values for This Transaction:")
+    top_input_features = input_df.iloc[0].sort_values(ascending=False).head(5)
+    for feat, val in top_input_features.items():
+        st.markdown(f"- **{feat.replace('_', ' ').capitalize()}**: `{val:.2f}`")
 
-    fig, ax = plt.subplots(figsize=(10, 6))
-    sns.heatmap(heatmap_data.corr(), annot=True, cmap="coolwarm", ax=ax)
-    ax.set_title("Anomaly Score Heatmap (Top Correlated Features)")
-    st.pyplot(fig)
-
-    st.markdown("### Feature Correlation Insights")
-    feature_corrs = heatmap_data.corr()['anomaly_score'].drop('anomaly_score')
-    for feat, val in feature_corrs.items():
-        direction = "increases" if val > 0 else "decreases"
-        st.markdown(f"- **{feat.replace('_', ' ').capitalize()}** has a correlation of `{val:.2f}`, meaning higher values {direction} fraud risk.")
-
-    # 🚨 Send email once automatically
     if d['fraud_score'] > 60 and d['email'] and not st.session_state.email_sent:
         tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
         email_sent = send_email_alert(
