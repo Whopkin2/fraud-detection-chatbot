@@ -60,9 +60,9 @@ def parse_account_age(text):
         elif "year" in text:
             return sanitize_numeric(text) * 365
         else:
-            return sanitize_numeric(text) * 365  # assume years if no unit
+            return sanitize_numeric(text) * 365
     except:
-        return 1  # default to 1 day if missing or error
+        return 1
 
 def standardize_categoricals(user_input):
     if "is_international" in user_input:
@@ -97,7 +97,6 @@ def send_email_alert(to_email, subject, message):
         st.error(f"❌ Email alert failed: {e}")
         return False
 
-# Session state
 if "submitted" not in st.session_state:
     st.session_state.submitted = False
 if "result_data" not in st.session_state:
@@ -181,7 +180,8 @@ and explain how these factors influence the model's decision.
         "fraud_score": fraud_score,
         "behavior_cluster": behavior_cluster,
         "explanation": explanation,
-        "email": account_owner_email
+        "email": account_owner_email,
+        "input_df": input_df
     }
 
 if st.session_state.submitted:
@@ -209,9 +209,12 @@ if st.session_state.submitted:
     st.markdown(d['explanation'])
 
     st.markdown("### 🔍 Key Feature Values for This Transaction:")
-    top_input_features = input_df.iloc[0].sort_values(ascending=False).head(5)
-    for feat, val in top_input_features.items():
-        st.markdown(f"- **{feat.replace('_', ' ').capitalize()}**: `{val:.2f}`")
+    if 'input_df' in d and not d['input_df'].empty:
+        top_input_features = d['input_df'].iloc[0].sort_values(ascending=False).head(5)
+        for feat, val in top_input_features.items():
+            st.markdown(f"- **{feat.replace('_', ' ').capitalize()}**: `{val:.2f}`")
+    else:
+        st.warning("⚠️ Could not compute top input features — input data may be invalid.")
 
     if d['fraud_score'] > 60 and d['email'] and not st.session_state.email_sent:
         tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
