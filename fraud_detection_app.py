@@ -18,10 +18,8 @@ st.set_page_config(page_title="Fraud Detector", layout="centered")
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# OpenAI client
 client = openai.OpenAI()
 
-# Load dataset
 DATA_PATH = "Banking Transactions Data For Fraud.xlsx"
 
 @st.cache_data
@@ -42,17 +40,22 @@ for col in categorical_cols:
     data[col] = le.fit_transform(data[col].astype(str))
     label_encoders[col] = le
 
-# Modeling
+# Clean training data (X)
 X = data.copy()
+
+# Fit Isolation Forest before modifying data
 isolation_model = IsolationForest(contamination=0.05, random_state=42)
 isolation_model.fit(X)
-X["anomaly_score"] = isolation_model.decision_function(X)
-X["is_fraud"] = isolation_model.predict(X)
 
-# KMeans clustering
+# Duplicate for analysis
+X_scored = X.copy()
+X_scored["anomaly_score"] = isolation_model.decision_function(X_scored)
+X_scored["is_fraud"] = isolation_model.predict(X_scored)
+
+# Behavioral clustering
 num_clusters = 4
 kmeans = KMeans(n_clusters=num_clusters, random_state=42)
-X["behavior_cluster"] = kmeans.fit_predict(X)
+X_scored["behavior_cluster"] = kmeans.fit_predict(X)
 
 def sanitize_numeric(value):
     if isinstance(value, str):
@@ -100,7 +103,7 @@ def predict_fraud(user_input):
         if key in user_input:
             user_input[key] = sanitize_numeric(user_input[key])
 
-    full_row = {col: user_input.get(col, 0 if col not in categorical_cols else "Unknown") for col in X.columns if col not in ["anomaly_score", "is_fraud", "behavior_cluster"]}
+    full_row = {col: user_input.get(col, 0 if col not in categorical_cols else "Unknown") for col in X.columns}
     input_df = pd.DataFrame([full_row])
 
     for col in input_df.columns:
@@ -115,7 +118,7 @@ def predict_fraud(user_input):
             input_df[col] = 1 if val in ["yes", "y", "true", "1"] else 0
 
     input_df = input_df.astype(float)
-    input_df = input_df.reindex(columns=X.columns.drop(["anomaly_score", "is_fraud", "behavior_cluster"]), fill_value=0)
+    input_df = input_df.reindex(columns=X.columns, fill_value=0)
 
     prediction = isolation_model.predict(input_df)[0]
     fraud_score = round(abs(isolation_model.decision_function(input_df)[0]), 2)
@@ -123,7 +126,6 @@ def predict_fraud(user_input):
     result = 1 if prediction == -1 else 0
     return result, fraud_score, behavior_cluster
 
-# Questions
 questions = [
     "Transaction Amount:",
     "Transaction Type (e.g., Purchase, Transfer, Withdrawal):",
@@ -146,7 +148,6 @@ keys = [
     "balance_after_transaction", "login_attempts", "transaction_duration"
 ]
 
-# Session
 if "question_index" not in st.session_state:
     st.session_state.question_index = 0
 if "user_answers" not in st.session_state:
@@ -218,9 +219,9 @@ with st.form("chat_form", clear_on_submit=True):
         st.markdown(explanation)
 
         # Anomaly Heatmap
-        top_features = X.drop(columns=["anomaly_score", "is_fraud", "behavior_cluster"]).corrwith(X["anomaly_score"]).abs().sort_values(ascending=False).head(10).index
-        heatmap_data = X[top_features].copy()
-        heatmap_data["anomaly_score"] = X["anomaly_score"]
+        top_features = X_scored.drop(columns=["anomaly_score", "is_fraud", "behavior_cluster"]).corrwith(X_scored["anomaly_score"]).abs().sort_values(ascending=False).head(10).index
+        heatmap_data = X_scored[top_features].copy()
+        heatmap_data["anomaly_score"] = X_scored["anomaly_score"]
 
         fig, ax = plt.subplots(figsize=(10, 6))
         sns.heatmap(heatmap_data.corr(), annot=True, cmap="coolwarm", ax=ax)
