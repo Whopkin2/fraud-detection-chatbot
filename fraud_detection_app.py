@@ -143,9 +143,9 @@ with st.form("user_input_form"):
                 example = " (Yes or No)"
             else:
                 example = ""
-            user_input[col] = st.text_input(f"{col}:{example}")
+            user_input[col] = st.text_input(f"{col.replace('_', ' ').capitalize()} {example}")
         else:
-            user_input[col] = st.text_input(f"{col} (numeric):")
+            user_input[col] = st.text_input(f"{col.replace('_', ' ').capitalize()} (numeric):")
 
     submitted = st.form_submit_button("Analyze Transaction")
 
