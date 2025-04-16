@@ -91,9 +91,9 @@ def predict_fraud(user_input):
     user_input = standardize_categoricals(user_input)
 
     if "account_age_days" in user_input:
-        user_input["account_age_days"] = sanitize_numeric(user_input["account_age_days"])
+    user_input["account_age_days"] = sanitize_numeric(user_input["account_age_days"]) * 365  # convert years to days
     if "transaction_duration" in user_input:
-        user_input["transaction_duration"] = sanitize_numeric(user_input["transaction_duration"])
+    user_input["transaction_duration"] = sanitize_numeric(user_input["transaction_duration"]) * 60  # convert minutes to seconds
 
     for key in ["transaction_amount", "balance_before_transaction", "balance_after_transaction", "customer_age", "login_attempts"]:
         if key in user_input:
@@ -145,7 +145,12 @@ with st.form("user_input_form"):
                 example = ""
             user_input[col] = st.text_input(f"{col.replace('_', ' ').capitalize()} {example}")
         else:
-            user_input[col] = st.text_input(f"{col.replace('_', ' ').capitalize()} (numeric):")
+            label = f"{col.replace('_', ' ').capitalize()} (numeric):"
+            if col == "account_age_days":
+                label = "Account age (in years):"
+            if col == "transaction_duration":
+                label = "Transaction duration (in minutes):"
+            user_input[col] = st.text_input(label)
 
     submitted = st.form_submit_button("Analyze Transaction")
 
@@ -191,3 +196,4 @@ if submitted:
     sns.heatmap(heatmap_data.corr(), annot=True, cmap="coolwarm", ax=ax)
     ax.set_title("Anomaly Score Heatmap (Top Correlated Features)")
     st.pyplot(fig)
+    st.caption("Note: The heatmap shows the correlation between the most anomaly-influencing features and the anomaly score. High correlation means the feature significantly impacts fraud prediction.")
