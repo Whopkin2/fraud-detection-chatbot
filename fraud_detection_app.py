@@ -168,20 +168,20 @@ if submitted:
                 to_email=user_email,
                 subject="Urgent: Potential Fraud Detected on Your Account",
                 message=(
-                    "Potential fraud has been detected on your account.
+                f"Potential fraud has been detected on your account.
 
 "
-                    "Our system flagged a suspicious transaction with a fraud likelihood score of {:.2f}%.
+                f"Our system flagged a suspicious transaction with a fraud likelihood score of {fraud_score:.2f}%.
 
 "
-                    "Recommended Actions:
+                "Recommended Actions:
 "
-                    "- Immediately verify this transaction.
+                "- Immediately verify this transaction.
 "
-                    "- Contact your financial institution if it seems unauthorized.
+                "- Contact your financial institution if it seems unauthorized.
 "
-                    "- Monitor your account activity closely over the next few days.
-"
+                "- Monitor your account activity closely over the next few days."
+            )
                     .format(fraud_score)
                 )
             )
