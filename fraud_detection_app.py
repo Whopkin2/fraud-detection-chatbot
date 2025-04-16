@@ -117,7 +117,7 @@ def predict_fraud(user_input):
 
     prediction = isolation_model.predict(input_df)[0]
     fraud_score = round(abs(isolation_model.decision_function(input_df)[0]), 2)
-    behavior_cluster = kmeans.predict(input_df)[0]
+    behavior_cluster = int(kmeans.predict(input_df)[0])
     result = 1 if prediction == -1 else 0
     return result, fraud_score, behavior_cluster
 
@@ -192,7 +192,7 @@ and explain how these factors influence the model's decision.
 
     st.markdown("---")
     st.markdown("### Risk Assessment Explanation:")
-    st.markdown(explanation)
+    st.markdown(f"<div style='font-family: Arial; font-size: 15px'>{explanation}</div>", unsafe_allow_html=True)
 
     top_features = X_scored.drop(columns=["anomaly_score", "is_fraud", "behavior_cluster"]).corrwith(X_scored["anomaly_score"]).abs().sort_values(ascending=False).head(10).index
     heatmap_data = X_scored[top_features].copy()
