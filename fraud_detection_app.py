@@ -17,13 +17,19 @@ load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 client = openai.OpenAI()
 
-DATA_PATH = "Banking Transactions Data For Fraud.xlsx"
+# 🔁 Upload file instead of reading from path
+uploaded_file = st.file_uploader("📁 Upload your transaction dataset (.xlsx)", type=["xlsx"])
 
 @st.cache_data
-def load_data():
-    return pd.read_excel(DATA_PATH)
+def load_data(file):
+    return pd.read_excel(file)
 
-data = load_data()
+if uploaded_file is not None:
+    data = load_data(uploaded_file)
+else:
+    st.warning("Please upload your Excel file to proceed.")
+    st.stop()
+
 data = data.drop(columns=["transaction_id", "device_id", "branch_code"])
 
 categorical_cols = data.select_dtypes(include=['object', 'bool']).columns
