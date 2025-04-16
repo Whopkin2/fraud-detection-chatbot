@@ -179,11 +179,7 @@ Include whether the transaction occurred during non-business hours (outside 9am-
 consider if it was a withdrawal from a new account, or a less risky deposit.
 Assess transaction size, account age, login attempts, and transaction duration,
 and explain how these factors influence the model's decision.
-""","
-        " consider if it was a withdrawal from a new account, or a less risky deposit."
-        " Assess transaction size, account age, login attempts, and transaction duration,"
-        " and explain how these factors influence the model's decision."
-    )
+"""
 
     response = client.chat.completions.create(
         model="gpt-4",
