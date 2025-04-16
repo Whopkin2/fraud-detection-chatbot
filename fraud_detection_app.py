@@ -171,13 +171,15 @@ if submitted:
     st.markdown(f"**Fraud Score:** {fraud_score}")
     st.markdown(f"**Behavioral Cluster:** {behavior_cluster}")
 
-    prompt = (
-        f"Given the transaction data: {user_input},
-"
-        f"and a model that flagged it as {result} with fraud score {fraud_score},
-"
-        "evaluate the transaction in detail."
-        " Include whether the transaction occurred during non-business hours (outside 9am-5pm),"
+    prompt = f"""
+Given the transaction data: {user_input},
+and a model that flagged it as {result} with fraud score {fraud_score},
+evaluate the transaction in detail.
+Include whether the transaction occurred during non-business hours (outside 9am-5pm),
+consider if it was a withdrawal from a new account, or a less risky deposit.
+Assess transaction size, account age, login attempts, and transaction duration,
+and explain how these factors influence the model's decision.
+""","
         " consider if it was a withdrawal from a new account, or a less risky deposit."
         " Assess transaction size, account age, login attempts, and transaction duration,"
         " and explain how these factors influence the model's decision."
