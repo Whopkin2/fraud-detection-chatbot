@@ -28,7 +28,7 @@ def load_data():
 data = load_data()
 
 # Drop identifier columns
-columns_to_drop = ["transaction_id", "device_id"]
+columns_to_drop = ["transaction_id", "device_id", "branch_code"]
 data = data.drop(columns=columns_to_drop)
 
 # Encode categorical variables
@@ -92,6 +92,8 @@ def predict_fraud(user_input):
 
     if "account_age_days" in user_input:
         user_input["account_age_days"] = sanitize_numeric(user_input["account_age_days"]) * 365  # convert years to days
+        if user_input["account_age_days"] == 0 and user_input.get("transaction_type", "").lower() == "deposit":
+            user_input["account_age_days"] = 1  # slightly age the account to avoid false positives on legitimate deposits
     if "transaction_duration" in user_input:
         user_input["transaction_duration"] = sanitize_numeric(user_input["transaction_duration"]) * 60  # convert minutes to seconds
 
@@ -170,9 +172,15 @@ if submitted:
     st.markdown(f"**Behavioral Cluster:** {behavior_cluster}")
 
     prompt = (
-        f"Given the transaction data: {user_input},\n"
-        f"and a model that flagged it as {result} with fraud score {fraud_score},\n"
-        "explain which behavioral and financial patterns may have contributed to this classification."
+        f"Given the transaction data: {user_input},
+"
+        f"and a model that flagged it as {result} with fraud score {fraud_score},
+"
+        "evaluate the transaction in detail."
+        " Include whether the transaction occurred during non-business hours (outside 9am-5pm),"
+        " consider if it was a withdrawal from a new account, or a less risky deposit."
+        " Assess transaction size, account age, login attempts, and transaction duration,"
+        " and explain how these factors influence the model's decision."
     )
 
     response = client.chat.completions.create(
@@ -196,4 +204,12 @@ if submitted:
     sns.heatmap(heatmap_data.corr(), annot=True, cmap="coolwarm", ax=ax)
     ax.set_title("Anomaly Score Heatmap (Top Correlated Features)")
     st.pyplot(fig)
-    st.caption("Note: The heatmap shows the correlation between the most anomaly-influencing features and the anomaly score. High correlation means the feature significantly impacts fraud prediction.")
+    st.caption("""
+This heatmap visualizes how strongly various transaction features are correlated with the anomaly score produced by the Isolation Forest model.
+
+- Features shown have the highest absolute correlation (positive or negative) with anomaly scores.
+- A **strong positive correlation** (closer to +1) means as the feature increases, the anomaly score tends to increase, flagging the transaction as more suspicious.
+- A **strong negative correlation** (closer to -1) means that as the feature increases, the model tends to view the transaction as less anomalous.
+
+Use this chart to identify which features most influence fraud detection in the current dataset.
+""")
