@@ -91,11 +91,11 @@ def predict_fraud(user_input):
     user_input = standardize_categoricals(user_input)
 
     if "account_age_days" in user_input:
-        user_input["account_age_days"] = sanitize_numeric(user_input["account_age_days"]) * 365  # convert years to days
+        user_input["account_age_days"] = sanitize_numeric(user_input["account_age_days"]) * 365
         if user_input["account_age_days"] == 0 and user_input.get("transaction_type", "").lower() == "deposit":
-            user_input["account_age_days"] = 1  # slightly age the account to avoid false positives on legitimate deposits
+            user_input["account_age_days"] = 1
     if "transaction_duration" in user_input:
-        user_input["transaction_duration"] = sanitize_numeric(user_input["transaction_duration"]) * 60  # convert minutes to seconds
+        user_input["transaction_duration"] = sanitize_numeric(user_input["transaction_duration"]) * 60
 
     for key in ["transaction_amount", "balance_before_transaction", "balance_after_transaction", "customer_age", "login_attempts"]:
         if key in user_input:
@@ -117,7 +117,7 @@ def predict_fraud(user_input):
 
     prediction = isolation_model.predict(input_df)[0]
     raw_score = isolation_model.decision_function(input_df)[0]
-    fraud_score = round((1 - raw_score) * 100, 2)  # Convert to percentage fraud likelihood
+    fraud_score = round((1 - raw_score) * 100, 2)
     behavior_cluster = int(kmeans.predict(input_df)[0])
     result = 1 if prediction == -1 else 0
     return result, fraud_score, behavior_cluster
@@ -161,6 +161,10 @@ if submitted:
     prediction, fraud_score, behavior_cluster = predict_fraud(user_input)
     result = "Fraudulent" if prediction == 1 else "Not Fraudulent"
 
+    st.markdown(f"### Prediction: {result}")
+    st.markdown(f"**Fraud Score:** {fraud_score}% likelihood of fraud")
+    st.markdown(f"**Behavioral Cluster:** {behavior_cluster}")
+
     if fraud_score > 60:
         user_email = st.text_input("Enter your email to receive a fraud alert:")
         if user_email:
@@ -168,28 +172,16 @@ if submitted:
                 to_email=user_email,
                 subject="Urgent: Potential Fraud Detected on Your Account",
                 message=(
-                    f"Potential fraud has been detected on your account.
+                    f"""Potential fraud has been detected on your account.
 
-"
-                    f"Our system flagged a suspicious transaction with a fraud likelihood score of {fraud_score:.2f}%.
+Our system flagged a suspicious transaction with a fraud likelihood score of {fraud_score:.2f}%.
 
-"
-                    "Recommended Actions:
-"
-                    "- Immediately verify this transaction.
-"
-                    "- Contact your financial institution if it seems unauthorized.
-"
-                    "- Monitor your account activity closely over the next few days."
+Recommended Actions:
+- Immediately verify this transaction.
+- Contact your financial institution if it seems unauthorized.
+- Monitor your account activity closely over the next few days."""
                 )
             )
-                    .format(fraud_score)
-                )
-            )
-
-    st.markdown(f"### Prediction: {result}")
-    st.markdown(f"**Fraud Score:** {fraud_score}% likelihood of fraud")
-    st.markdown(f"**Behavioral Cluster:** {behavior_cluster}")
 
     prompt = f"""
 Given the transaction data: {user_input},
