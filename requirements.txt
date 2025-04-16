@@ -3,7 +3,7 @@ pandas
 openai
 python-dotenv
 scikit-learn
-xgboost
+matplotlib
+seaborn
 numpy
-Pillow
-openpyxl
+xlrd
