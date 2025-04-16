@@ -116,7 +116,8 @@ def predict_fraud(user_input):
     input_df = input_df.reindex(columns=X.columns, fill_value=0)
 
     prediction = isolation_model.predict(input_df)[0]
-    fraud_score = round(abs(isolation_model.decision_function(input_df)[0]), 2)
+    raw_score = isolation_model.decision_function(input_df)[0]
+    fraud_score = round((1 - raw_score) * 100, 2)  # Convert to percentage fraud likelihood
     behavior_cluster = int(kmeans.predict(input_df)[0])
     result = 1 if prediction == -1 else 0
     return result, fraud_score, behavior_cluster
@@ -160,15 +161,33 @@ if submitted:
     prediction, fraud_score, behavior_cluster = predict_fraud(user_input)
     result = "Fraudulent" if prediction == 1 else "Not Fraudulent"
 
-    if prediction == 1:
-        send_email_alert(
-            to_email="your_recipient@example.com",
-            subject="Fraud Alert",
-            message=f"Potential fraud detected:\n\n{user_input}\n\nFraud Score: {fraud_score}"
-        )
+    if fraud_score > 60:
+        user_email = st.text_input("Enter your email to receive a fraud alert:")
+        if user_email:
+            send_email_alert(
+                to_email=user_email,
+                subject="Urgent: Potential Fraud Detected on Your Account",
+                message=(
+                    "Potential fraud has been detected on your account.
+
+"
+                    "Our system flagged a suspicious transaction with a fraud likelihood score of {:.2f}%.
+
+"
+                    "Recommended Actions:
+"
+                    "- Immediately verify this transaction.
+"
+                    "- Contact your financial institution if it seems unauthorized.
+"
+                    "- Monitor your account activity closely over the next few days.
+"
+                    .format(fraud_score)
+                )
+            )
 
     st.markdown(f"### Prediction: {result}")
-    st.markdown(f"**Fraud Score:** {fraud_score}")
+    st.markdown(f"**Fraud Score:** {fraud_score}% likelihood of fraud")
     st.markdown(f"**Behavioral Cluster:** {behavior_cluster}")
 
     prompt = f"""
@@ -202,12 +221,7 @@ and explain how these factors influence the model's decision.
     sns.heatmap(heatmap_data.corr(), annot=True, cmap="coolwarm", ax=ax)
     ax.set_title("Anomaly Score Heatmap (Top Correlated Features)")
     st.pyplot(fig)
-    st.caption("""
-This heatmap visualizes how strongly various transaction features are correlated with the anomaly score produced by the Isolation Forest model.
-
-- Features shown have the highest absolute correlation (positive or negative) with anomaly scores.
-- A **strong positive correlation** (closer to +1) means as the feature increases, the anomaly score tends to increase, flagging the transaction as more suspicious.
-- A **strong negative correlation** (closer to -1) means that as the feature increases, the model tends to view the transaction as less anomalous.
-
-Use this chart to identify which features most influence fraud detection in the current dataset.
-""")
+    feature_corrs = heatmap_data.corr()['anomaly_score'].drop('anomaly_score')
+    for feat, val in feature_corrs.items():
+        direction = "increases" if val > 0 else "decreases"
+        st.markdown(f"**{feat.replace('_', ' ').capitalize()}** has a correlation of `{val:.2f}`, which means higher values in this feature {direction} the likelihood of being flagged as fraud.")
