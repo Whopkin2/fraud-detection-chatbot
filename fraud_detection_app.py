@@ -23,10 +23,9 @@ def load_data():
     return pd.read_excel(DATA_PATH)
 
 data = load_data()
-data = data.drop(columns=["transaction_id"])
+data = data.drop(columns=["transaction_id", "branch_code", "device_id"])
 
 # Feature Engineering
-data["balance_change"] = data["balance_before_transaction"] - data["balance_after_transaction"]
 data["is_negative_balance_after"] = (data["balance_after_transaction"] < 0).astype(int)
 data["is_late_night"] = data["time_of_day"].apply(lambda x: 1 if str(x).lower() in ["night", "evening"] else 0)
 
@@ -40,8 +39,8 @@ for col in categorical_cols:
 features = [
     "transaction_amount", "is_international", "transaction_method", "time_of_day",
     "account_age_days", "login_attempts", "balance_before_transaction",
-    "balance_after_transaction", "transaction_duration", "device_id", "branch_code",
-    "balance_change", "is_negative_balance_after", "is_late_night"
+    "balance_after_transaction", "transaction_duration",
+    "is_negative_balance_after", "is_late_night"
 ]
 X = data[features]
 
@@ -74,6 +73,9 @@ def parse_account_age(text):
             return sanitize_numeric(text)
     except:
         return 1
+
+def parse_yes_no(value):
+    return 1 if str(value).strip().lower() in ['yes', 'y', 'true', '1'] else 0
 
 def standardize_categoricals(user_input):
     if "is_international" in user_input:
@@ -130,6 +132,8 @@ with st.form("user_input_form"):
                 label += " (e.g., online / ATM / swipe / in-person)"
             elif col == "is_international":
                 label += " (Yes or No)"
+        elif col in ["is_negative_balance_after", "is_late_night"]:
+            label += " (Yes or No)"
         else:
             if col == "account_age_days":
                 label = "Account age (e.g., '12 months' or '2 years')"
@@ -149,6 +153,9 @@ if submitted:
     for k in ["transaction_amount", "balance_before_transaction", "balance_after_transaction", "customer_age", "login_attempts"]:
         user_input[k] = sanitize_numeric(user_input.get(k, "0"))
 
+    user_input["is_negative_balance_after"] = parse_yes_no(user_input.get("is_negative_balance_after", "No"))
+    user_input["is_late_night"] = parse_yes_no(user_input.get("is_late_night", "No"))
+
     full_row = {col: user_input.get(col, 0 if col not in categorical_cols else "Unknown") for col in features}
     input_df = pd.DataFrame([full_row])
 
@@ -160,11 +167,6 @@ if submitted:
             input_df[col] = label_encoders[col].transform([fallback])[0]
 
     input_df = input_df.astype(float).reindex(columns=X.columns, fill_value=0)
-
-    # Add engineered features
-    input_df["balance_change"] = input_df["balance_before_transaction"] - input_df["balance_after_transaction"]
-    input_df["is_negative_balance_after"] = (input_df["balance_after_transaction"] < 0).astype(int)
-    input_df["is_late_night"] = input_df["time_of_day"].apply(lambda x: 1 if str(x).lower() in ["night", "evening"] else 0)
 
     prediction = isolation_model.predict(input_df)[0]
     raw_score = isolation_model.decision_function(input_df)[0]
@@ -229,7 +231,6 @@ if st.session_state.submitted:
         for feat, val in top_input_features.items():
             st.markdown(f"- **{feat.replace('_', ' ').capitalize()}**: `{val:.2f}`")
 
-    # ✅ FINAL FIX: Email sent only if it's fraudulent AND score > 75%
     if d['result'] == "Fraudulent" and d['fraud_score'] > 75 and d['email'] and not st.session_state.email_sent:
         tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
         email_sent = send_email_alert(
