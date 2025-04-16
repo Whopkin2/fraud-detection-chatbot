@@ -13,12 +13,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 st.set_page_config(page_title="Fraud Detector", layout="centered")
-
-# Load API and Email config
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
-
 client = openai.OpenAI()
+
 DATA_PATH = "Banking Transactions Data For Fraud.xlsx"
 
 @st.cache_data
@@ -54,6 +52,15 @@ def sanitize_numeric(value):
     except:
         return 0.0
 
+def parse_account_age(text):
+    text = text.lower()
+    if "month" in text:
+        return sanitize_numeric(text) / 12 * 365
+    elif "year" in text:
+        return sanitize_numeric(text) * 365
+    else:
+        return sanitize_numeric(text) * 365  # default to years
+
 def standardize_categoricals(user_input):
     if "is_international" in user_input:
         val = user_input["is_international"].strip().lower()
@@ -80,13 +87,11 @@ def send_email_alert(to_email, subject, message):
     except Exception as e:
         st.error(f"❌ Email alert failed: {e}")
 
-def predict_fraud(user_input, age_unit):
+def predict_fraud(user_input):
     user_input = standardize_categoricals(user_input)
 
     if "account_age_days" in user_input:
-        age_val = sanitize_numeric(user_input["account_age_days"])
-        user_input["account_age_days"] = (age_val / 12 * 365) if age_unit == "Months" else (age_val * 365)
-
+        user_input["account_age_days"] = parse_account_age(str(user_input["account_age_days"]))
         if user_input["account_age_days"] == 0 and user_input.get("transaction_type", "").lower() == "deposit":
             user_input["account_age_days"] = 1
 
@@ -118,14 +123,12 @@ def predict_fraud(user_input, age_unit):
     result = 1 if prediction == -1 else 0
     return result, fraud_score, behavior_cluster
 
-# UI Setup
-st.markdown("## 🕵️‍♂️ Fraud Detection Chatbot")
+# App UI
+st.markdown("## 🕵️ Fraud Detection Chatbot")
 
 with st.form("user_input_form"):
     st.markdown("### Enter transaction data:")
     user_input = {}
-    age_unit = "Years"
-
     for col in X.columns:
         label = col.replace('_', ' ').capitalize()
         if col in categorical_cols:
@@ -139,33 +142,34 @@ with st.form("user_input_form"):
                 label += " (Yes or No)"
         else:
             if col == "account_age_days":
-                label = "Account age:"
-                age_unit = st.selectbox("Select unit for account age:", ["Years", "Months"])
+                label = "Account age (e.g., '12 months' or '2 years'):"
             elif col == "transaction_duration":
                 label = "Transaction duration (in minutes):"
             else:
                 label += " (numeric)"
         user_input[col] = st.text_input(label)
 
-    email_input = st.text_input("Enter account owner's email (used for alert):")
+    account_owner_email = st.text_input("Account owner's email (for alert):")
     submitted = st.form_submit_button("Analyze Transaction")
 
 if submitted:
-    prediction, fraud_score, behavior_cluster = predict_fraud(user_input, age_unit)
+    prediction, fraud_score, behavior_cluster = predict_fraud(user_input)
     result = "Fraudulent" if prediction == 1 else "Not Fraudulent"
 
     st.markdown(f"### 🧾 Prediction: **{result}**")
-    st.markdown(f"**Fraud Score:** {fraud_score}% likelihood")
-    
-    cluster_desc = {
-        0: "Typical low-risk user with consistent behavior.",
-        1: "Moderate risk user with minor irregularities.",
-        2: "High-risk profile with multiple behavioral flags.",
-        3: "New or erratic user, limited transaction history."
+    st.markdown(f"**Fraud Score:** {fraud_score}%")
+
+    cluster_descriptions = {
+        0: "Low risk – consistent behavior pattern.",
+        1: "Moderate risk – some irregular activity.",
+        2: "High risk – significant anomalies detected.",
+        3: "New/erratic user – limited behavioral history."
     }
-    cluster_info = cluster_desc.get(behavior_cluster, "Unrecognized cluster pattern.")
+    cluster_info = cluster_descriptions.get(behavior_cluster, "Unrecognized cluster.")
+
     st.markdown(f"**Behavioral Cluster:** {behavior_cluster} – {cluster_info}")
 
+    # AI explanation
     prompt = f"""
 Given the transaction data: {user_input},
 and a model that flagged it as {result} with fraud score {fraud_score},
@@ -175,7 +179,6 @@ consider if it was a withdrawal from a new account, or a less risky deposit.
 Assess transaction size, account age, login attempts, and transaction duration,
 and explain how these factors influence the model's decision.
 """
-
     response = client.chat.completions.create(
         model="gpt-4",
         messages=[
@@ -184,18 +187,33 @@ and explain how these factors influence the model's decision.
         ]
     )
     explanation = response.choices[0].message.content
-
     st.markdown("---")
     st.markdown("### 🔍 Risk Assessment Explanation")
     st.markdown(f"<div style='font-family: Arial; font-size: 15px'>{explanation}</div>", unsafe_allow_html=True)
 
-    # Email alert trigger after all info
+    # Anomaly explanation
+    top_features = X_scored.drop(columns=["anomaly_score", "is_fraud", "behavior_cluster"]).corrwith(X_scored["anomaly_score"]).abs().sort_values(ascending=False).head(10).index
+    heatmap_data = X_scored[top_features].copy()
+    heatmap_data["anomaly_score"] = X_scored["anomaly_score"]
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.heatmap(heatmap_data.corr(), annot=True, cmap="coolwarm", ax=ax)
+    ax.set_title("Anomaly Score Heatmap (Top Correlated Features)")
+    st.pyplot(fig)
+
+    st.markdown("### 🧠 Anomaly Score Contributions")
+    for feat, val in heatmap_data.corr()['anomaly_score'].drop('anomaly_score').items():
+        direction = "increases" if val > 0 else "decreases"
+        st.markdown(f"- **{feat.replace('_', ' ').capitalize()}**: `{val:.2f}` correlation – higher values {direction} fraud likelihood.")
+
+    # Final email action
+    st.markdown("---")
     if fraud_score > 60:
-        if st.button("📧 Send Email Alert Now"):
-            if email_input:
+        if st.button("📧 Send Email Alert"):
+            if account_owner_email:
                 transaction_summary = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in user_input.items()])
                 send_email_alert(
-                    to_email=email_input,
+                    to_email=account_owner_email,
                     subject="⚠️ Fraud Alert: Suspicious Transaction Detected",
                     message=(
                         f"""⚠️ A transaction was flagged with a fraud score of {fraud_score:.2f}%.\n
@@ -214,19 +232,4 @@ Recommended Actions:
                     )
                 )
             else:
-                st.warning("Please enter the account owner's email above before sending.")
-
-    # Anomaly heatmap
-    top_features = X_scored.drop(columns=["anomaly_score", "is_fraud", "behavior_cluster"]).corrwith(X_scored["anomaly_score"]).abs().sort_values(ascending=False).head(10).index
-    heatmap_data = X_scored[top_features].copy()
-    heatmap_data["anomaly_score"] = X_scored["anomaly_score"]
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-    sns.heatmap(heatmap_data.corr(), annot=True, cmap="coolwarm", ax=ax)
-    ax.set_title("Anomaly Score Heatmap (Top Correlated Features)")
-    st.pyplot(fig)
-
-    feature_corrs = heatmap_data.corr()['anomaly_score'].drop('anomaly_score')
-    for feat, val in feature_corrs.items():
-        direction = "increases" if val > 0 else "decreases"
-        st.markdown(f"**{feat.replace('_', ' ').capitalize()}** has a correlation of `{val:.2f}`, meaning higher values in this feature {direction} the likelihood of fraud.")
+                st.warning("Please enter the account owner's email to send the alert.")
