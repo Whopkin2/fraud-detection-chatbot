@@ -139,20 +139,30 @@ with st.form("user_input_form"):
     user_input = {}
     for col in features:
         label = col.replace('_', ' ').capitalize()
-        if col in categorical_cols:
-            label += " (categorical)"
-        elif col in ["is_negative_balance_after", "is_late_night"]:
+        if col in ["is_negative_balance_after", "is_late_night"]:
             label += " (Yes or No)"
+            user_input[col] = st.selectbox(label, ["Yes", "No"], key=col)
+        elif col == "account_age_days":
+            label = "Account age (e.g., '12 months' or '2 years')"
+            user_input[col] = st.text_input(label, key=col)
+        elif col == "transaction_duration":
+            label = "Transaction duration (e.g., '3 minutes' or '2 hours')"
+            user_input[col] = st.text_input(label, key=col)
+        elif col == "customer_age":
+            label = "Customer age (e.g., '24 years')"
+            user_input[col] = st.text_input(label, key=col)
+        elif col == "is_international":
+            label += " (categorical)"
+            user_input[col] = st.selectbox(label, ["Yes", "No"], key=col)
+        elif col == "transaction_method":
+            label += " (categorical)"
+            user_input[col] = st.selectbox(label, ["ATM", "Online", "POS", "Mobile", "Wire"], key=col)
+        elif col == "time_of_day":
+            label += " (categorical)"
+            user_input[col] = st.selectbox(label, ["Morning", "Afternoon", "Evening", "Night"], key=col)
         else:
-            if col == "account_age_days":
-                label = "Account age (e.g., '12 months' or '2 years')"
-            elif col == "transaction_duration":
-                label = "Transaction duration (e.g., '3 minutes' or '2 hours')"
-            elif col == "customer_age":
-                label = "Customer age (e.g., '24 years')"
-            else:
-                label += " (numeric)"
-        user_input[col] = st.text_input(label, key=col)
+            label += " (numeric)"
+            user_input[col] = st.text_input(label, key=col)
 
     account_owner_email = st.text_input("Account owner's email (for alert):")
     submitted = st.form_submit_button("Analyze Transaction")
