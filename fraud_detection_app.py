@@ -9,6 +9,7 @@ import numpy as np
 import smtplib
 from email.mime.text import MIMEText
 import re
+from scipy.special import expit  # For sigmoid transformation
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -26,6 +27,7 @@ def load_data():
 data = load_data()
 data = data.drop(columns=["transaction_id", "branch_code", "device_id"])
 
+# Feature Engineering
 data["is_negative_balance_after"] = (data["balance_after_transaction"] < 0).astype(int)
 data["is_late_night"] = data["time_of_day"].apply(lambda x: 1 if str(x).lower() in ["night", "evening"] else 0)
 
@@ -185,10 +187,12 @@ if submitted:
 
     prediction = isolation_model.predict(input_df)[0]
     raw_score = isolation_model.decision_function(input_df)[0]
-    confidence_score = round(((-raw_score + 0.5) / 1.0) * 100, 2)
-    confidence_score = max(0.0, min(confidence_score, 100.0))
-    result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
 
+    # 🔁 Updated logic: use sigmoid to scale more generously
+    sigmoid_score = expit(-raw_score * 5)  # scaling factor improves spread
+    confidence_score = round(sigmoid_score * 100, 2)
+
+    result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
     true_prediction = result
     if result == "Fraudulent" and confidence_score < 65:
         result = "Not Fraudulent (Low Confidence)"
