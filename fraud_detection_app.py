@@ -206,8 +206,7 @@ if submitted:
     ]
 
     prompt = f"""
-Given the transaction data: {user_input},\nPredicted: {result} with a confidence score of {confidence_score}%,\nBehavioral Risk Rating: {rating}/5\nExplain these findings to the user in layman's terms.
-"""
+Given the transaction data: {user_input},\nPredicted: {result} with a confidence score of {confidence_score}%,\nBehavioral Risk Rating: {rating}/5\n"""
 
     response = client.chat.completions.create(
         model="gpt-4",
