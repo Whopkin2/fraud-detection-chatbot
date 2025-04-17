@@ -236,7 +236,20 @@ if st.session_state.submitted:
     st.markdown(f"**Confidence Level:** {d['confidence_score']}% Confident")
 
     if "behavior_rating" in d:
-    st.markdown(f"**🧠 Behavioral Risk Rating:** {d['behavior_rating']} / 5")
+        st.markdown(f"**🧠 Behavioral Risk Rating:** {d['behavior_rating']} / 5")
+        st.markdown("### 🧠 Behavioral Risk Rating Explanation:")
+        st.markdown("""
+This score is computed based on the following weighted risk factors:
+
+- **+1.0** if account is less than 90 days old
+- **+0.5** if there are more than 3 login attempts
+- **+1.0** if the transaction amount exceeds $5,000
+- **+0.5** if the transaction occurred at night or evening
+- **+0.5** if the transaction method is Online or Mobile
+- **+0.5** if the model flagged this transaction as fraudulent
+
+The score is capped at 5.0. A higher score means riskier behavioral patterns.
+        """)
 
      "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
         if st.button("📧 Send Fraud Alert Email"):
