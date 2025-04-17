@@ -245,6 +245,27 @@ if st.session_state.submitted:
     for insight in d.get('anomaly_insights', []):
         st.markdown(insight)
 
+    # Anomaly Heatmap Explanation
+    st.markdown("### 📊 Anomaly Feature Contribution:")
+    top_features = d['input_df'].iloc[0].sort_values(ascending=False)
+    for feature, value in top_features.items():
+        explanation = ""
+        if feature == "transaction_amount":
+            explanation = "Large transaction amounts can indicate abnormal or unauthorized withdrawals."
+        elif feature == "account_age_days":
+            explanation = "Newer accounts are often more vulnerable to fraud."
+        elif feature == "login_attempts":
+            explanation = "Multiple login attempts may suggest account takeover attempts."
+        elif feature == "is_late_night":
+            explanation = "Transactions occurring late at night are riskier."
+        elif feature == "is_negative_balance_after":
+            explanation = "Negative post-transaction balances can suggest insufficient funds or misuse."
+        elif feature == "transaction_duration":
+            explanation = "Extremely short transaction durations can reflect automated fraud."
+        else:
+            explanation = "This feature contributes to the anomaly based on learned patterns."
+        st.markdown(f"- **{feature.replace('_', ' ').capitalize()}**: `{value:.2f}` – {explanation}")
+
     if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
         if st.button("📧 Send Fraud Alert Email"):
             tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
