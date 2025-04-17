@@ -228,21 +228,31 @@ if st.session_state.submitted:
     rating = round(min(max(rating, 0.0), 5.0), 1)
 
     st.markdown("### 🧠 Behavioral Risk Rating Explanation and Score:")
-    st.markdown("This score is computed based on the following weighted risk factors:")
-    st.markdown("<ul>" + "".join([f"<li>{line}</li>" for line in explanation_bullets]) + "</ul>", unsafe_allow_html=True)
-    st.markdown(f"🧠 **Behavioral Risk Rating: {rating} / 5**")
+    st.markdown("""
+This score is computed based on the following weighted risk factors:
 
-    st.markdown("### \U0001f4ca Adjusted Anomaly Heatmap (Fraud Risk Based):")
+- **+1.0 / –1.0** → Account age (<90 days = +1.0, otherwise –1.0)
+- **+0.5 / –0.5** → Login attempts (>3 = +0.5, otherwise –0.5)
+- **+1.0 / –1.0** → Transaction amount exceeds $5,000 = +1.0, otherwise –1.0
+- **+0.5 / –0.5** → Night/evening transaction = +0.5, otherwise –0.5
+- **+0.5 / –0.5** → Method is Online or Mobile = +0.5, otherwise –0.5
+- **+0.5 / –0.5** → Transaction is international = +0.5, otherwise –0.5
+- **+0.5 / –0.5** → Negative balance after transaction = +0.5, otherwise –0.5
+- **+0.5 / –0.5** → Short duration (<2 min = +0.5, else –0.5)
+- **+0.5 / –0.5** → Young age (<20 = +0.5, else –0.5)
+""")
+st.markdown(f"🧠 **Behavioral Risk Rating: {rating} / 5**")
+
+    st.markdown("### 📊 Adjusted Anomaly Heatmap (Fraud Risk Based):")
     fig, ax = plt.subplots(figsize=(10, 6))
     heat_data = d['input_df'].T.copy()
     mean_vals = X.mean()
     std_vals = X.std() + 1e-6
     fraud_scores = ((heat_data - mean_vals) / std_vals).abs()
     fraud_scores = fraud_scores.clip(0, 3)
-    cmap = sns.diverging_palette(10, 220, as_cmap=True)
+    cmap = sns.diverging_palette(240, 10, as_cmap=True)
     sns.heatmap(fraud_scores.to_frame(name='Fraud Likelihood Score'), annot=True, cmap=cmap, fmt=".2f", ax=ax, center=1.5, cbar_kws={'label': 'Fraud Likelihood Score'})
     ax.set_ylabel("Features")
-    st.pyplot(fig)
 
     st.markdown("**🔍 Heatmap Explanation:**")
     for feature, value in d['input_df'].iloc[0].items():
