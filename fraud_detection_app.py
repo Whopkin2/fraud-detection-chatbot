@@ -242,22 +242,48 @@ if st.session_state.submitted:
     st.markdown(f"### Prediction: **{d['result']}**")
     st.markdown(f"**Confidence Level:** {d['confidence_score']}% Confident")
 
-    st.markdown("### 🧠 Behavioral Risk Rating (+/– System)")
-    st.markdown(f"**Behavioral Risk Rating: {d['behavior_rating']} / 5**")
+    st.markdown("### 🧠 Behavioral Risk Rating Breakdown")
 
-    st.markdown("""
-Each factor contributes + or – to the behavioral score based on risk conditions:
+score = d['behavior_rating']
+user = d['user_input']
 
-- **+1.0 / –1.0** → Account age (<90 days = +1.0, otherwise –1.0)  
-- **+0.5 / –0.5** → Login attempts (>3 = +0.5, otherwise –0.5)  
-- **+1.0 / –1.0** → Transaction > $5,000 = +1.0, otherwise –1.0  
-- **+0.5 / –0.5** → Night/evening = +0.5, otherwise –0.5  
-- **+0.5 / –0.5** → Method = Online/Mobile = +0.5, otherwise –0.5  
-- **+0.5 / –0.5** → is_international = +0.5, otherwise –0.5  
-- **+0.5 / –0.5** → Negative balance = +0.5, otherwise –0.5  
-- **+0.5 / –0.5** → Short duration (<2 min = +0.5, else –0.5)  
-- **+0.5 / –0.5** → Young age (<20 = +0.5, else –0.5)  
-""")
+# Detailed breakdown with reasoning
+score_factors = []
+
+score_factors.append(("Account Age", +1.0 if user["account_age_days"] < 90 else -1.0,
+                      "Account is new" if user["account_age_days"] < 90 else "Account is established"))
+score_factors.append(("Login Attempts", +0.5 if user["login_attempts"] > 3 else -0.5,
+                      "Too many login attempts" if user["login_attempts"] > 3 else "Login count is normal"))
+score_factors.append(("Transaction Amount", +1.0 if user["transaction_amount"] > 5000 else -1.0,
+                      "Large transaction amount" if user["transaction_amount"] > 5000 else "Amount is modest"))
+score_factors.append(("Time of Day", +0.5 if user["is_late_night"] == 1 else -0.5,
+                      "Suspicious late-night timing" if user["is_late_night"] == 1 else "Normal hours"))
+score_factors.append(("Method", +0.5 if user["transaction_method"] in ["Online", "Mobile"] else -0.5,
+                      "Remote transaction method" if user["transaction_method"] in ["Online", "Mobile"] else "In-person method"))
+score_factors.append(("International", +0.5 if user["is_international"] == "Yes" else -0.5,
+                      "International transaction" if user["is_international"] == "Yes" else "Domestic transaction"))
+score_factors.append(("Negative Balance", +0.5 if user["is_negative_balance_after"] == 1 else -0.5,
+                      "Ends in negative balance" if user["is_negative_balance_after"] == 1 else "Balance is sufficient"))
+score_factors.append(("Short Duration", +0.5 if user["transaction_duration"] < 2 else -0.5,
+                      "Suspiciously fast transaction" if user["transaction_duration"] < 2 else "Normal duration"))
+score_factors.append(("Young Age", +0.5 if user["customer_age"] < 20 else -0.5,
+                      "Very young customer" if user["customer_age"] < 20 else "Customer age is mature"))
+
+st.markdown(f"**Total Behavioral Risk Rating: {score} / 5**")
+
+for factor, impact, reason in score_factors:
+    sign = "+" if impact > 0 else "–"
+    st.markdown(f"- **{factor}**: {sign}{abs(impact)} → _{reason}_")
+
+# Summary sentence
+if score >= 4.0:
+    summary = "This transaction shows multiple high-risk traits. Please investigate urgently."
+elif score >= 2.5:
+    summary = "There are moderate risk indicators present. Further review is recommended."
+else:
+    summary = "Low behavioral risk detected. Transaction appears typical."
+
+st.markdown(f"📌 **Summary**: {summary}")
 
     st.markdown("### Explanation:")
     st.markdown(d['explanation'])
