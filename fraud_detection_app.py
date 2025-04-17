@@ -243,7 +243,7 @@ This score is computed based on the following weighted risk factors:
 """)
 st.markdown(f"🧠 **Behavioral Risk Rating: {rating} / 5**")
 
-    st.markdown("### 📊 Adjusted Anomaly Heatmap (Fraud Risk Based):")
+        st.markdown("### 📊 Adjusted Anomaly Heatmap (Fraud Risk Based):")
     fig, ax = plt.subplots(figsize=(10, 6))
     heat_data = d['input_df'].T.copy()
     mean_vals = X.mean()
