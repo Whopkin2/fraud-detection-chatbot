@@ -363,14 +363,13 @@ Recommended Actions:
     sns.heatmap(heat_data, annot=True, cmap="Reds", fmt=".2f", ax=ax, cbar_kws={'label': 'Feature Value'})
     st.pyplot(fig)
 
-    if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
-        if st.button("📧 Send Fraud Alert Email"):
-            tx = "
-".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
-            email_sent = send_email_alert(
-                to_email=d['email'],
-                subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
-                message=f"""A transaction was flagged with a **confidence level of {d['confidence_score']}%**.
+  if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
+    if st.button("📧 Send Fraud Alert Email"):
+        tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
+        email_sent = send_email_alert(
+            to_email=d['email'],
+            subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
+            message=f"""A transaction was flagged with a **confidence level of {d['confidence_score']}%**.
 
 Behavioral Risk Rating: {d['behavior_rating']} / 5
 
@@ -381,7 +380,10 @@ Recommended Actions:
 - Verify this transaction
 - Contact your bank if unauthorized
 - Monitor account activity immediately."""
-            )
-            if email_sent:
-                st.success("✅ Alert sent to account owner and admin.")
-                st.session_state.email_sent = True
+        )
+        if email_sent:
+            st.success("✅ Alert sent to account owner and admin.")
+            st.session_state.email_sent = True
+        else:
+            st.error("❌ Email failed to send.")
+  
