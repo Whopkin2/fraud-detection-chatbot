@@ -352,7 +352,7 @@ Recommended Actions:
                 st.success("✅ Alert sent to account owner and admin.")
                 st.session_state.email_sent = True
             else:
-                st.error("❌ Email failed to send.")    d = st.session_state.result_data
+                st.error("❌ Email failed to send.")
     st.markdown(f"### Prediction: **{d['result']}**")
     st.markdown(f"**Confidence Level:** {d['confidence_score']}% Confident")
     st.markdown(f"**Behavioral Risk Rating:** {d['behavior_rating']} / 5")
