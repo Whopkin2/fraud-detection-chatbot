@@ -5,14 +5,10 @@ import os
 from dotenv import load_dotenv
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import LabelEncoder
-from sklearn.cluster import KMeans
-from sklearn.metrics.pairwise import euclidean_distances
 import numpy as np
 import smtplib
 from email.mime.text import MIMEText
 import re
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 st.set_page_config(page_title="Fraud Detector", layout="centered")
 load_dotenv()
@@ -28,6 +24,7 @@ def load_data():
 data = load_data()
 data = data.drop(columns=["transaction_id", "branch_code", "device_id"])
 
+# Feature Engineering
 data["is_negative_balance_after"] = (data["balance_after_transaction"] < 0).astype(int)
 data["is_late_night"] = data["time_of_day"].apply(lambda x: 1 if str(x).lower() in ["night", "evening"] else 0)
 
@@ -46,18 +43,8 @@ features = [
 ]
 X = data[features]
 
-# Train Isolation Forest model
 isolation_model = IsolationForest(contamination=0.05, n_estimators=200, max_features=0.9, random_state=42)
 isolation_model.fit(X)
-
-# Train KMeans for behavioral clustering
-kmeans = KMeans(n_clusters=5, random_state=42)
-data["cluster"] = kmeans.fit_predict(X)
-
-# Calculate anomaly scores and cluster stats
-data["anomaly_score"] = isolation_model.decision_function(X)
-cluster_centers = kmeans.cluster_centers_
-cluster_stats = data.groupby("cluster")["anomaly_score"].agg(["mean", "std"]).reset_index()
 
 def sanitize_numeric(value):
     if isinstance(value, str):
@@ -126,7 +113,7 @@ def send_email_alert(to_email, subject, message):
 
         return True
     except Exception as e:
-        st.error(f"❌ Email alert failed: {e}")
+        st.error(f"\u274c Email alert failed: {e}")
         return False
 
 if "submitted" not in st.session_state:
@@ -136,10 +123,10 @@ if "result_data" not in st.session_state:
 if "email_sent" not in st.session_state:
     st.session_state.email_sent = False
 
-st.markdown("## 🕵️‍♂️ <span style='font-family: Arial;'>Fraud Detection Chatbot</span>", unsafe_allow_html=True)
+st.markdown("## \U0001f575️ <span style='font-family: Arial;'>Fraud Detection Chatbot</span>", unsafe_allow_html=True)
 
 with st.form("user_input_form"):
-    st.markdown("### Enter transaction data:", unsafe_allow_html=True)
+    st.markdown("### <span style='font-family: Arial;'>Enter transaction data:</span>", unsafe_allow_html=True)
     user_input = {}
     for col in features:
         label = col.replace('_', ' ').capitalize()
@@ -197,36 +184,26 @@ if submitted:
 
     prediction = isolation_model.predict(input_df)[0]
     raw_score = isolation_model.decision_function(input_df)[0]
-
-    # Cluster-based confidence calculation
-    input_vector = input_df.values
-    dists = euclidean_distances(cluster_centers, input_vector)
-    closest_cluster = np.argmin(dists)
-    dist_to_center = dists[closest_cluster][0]
-
-    cluster_mean = cluster_stats.loc[closest_cluster, "mean"]
-    cluster_std = cluster_stats.loc[closest_cluster, "std"]
-
-    if dist_to_center < 0.5 and cluster_std < 0.2:
-        confidence_score = 95.0 if prediction != -1 else 85.0
-    elif cluster_std > 0.6:
-        confidence_score = 55.0 if prediction != -1 else 45.0
-    else:
-        confidence_score = 70.0 if prediction != -1 else 60.0
-
+    confidence_score = round(((-raw_score + 0.5) / 1.0) * 100, 2)
+    confidence_score = max(0.0, min(confidence_score, 100.0))
     result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
-    true_prediction = result
-    if result == "Fraudulent" and confidence_score < 65:
-        result = "Not Fraudulent (Low Confidence)"
 
-    rating = 0.0
+    rating = 1.0
     if user_input["account_age_days"] < 90: rating += 1.0
     if user_input["login_attempts"] > 3: rating += 0.5
     if user_input["transaction_amount"] > 5000: rating += 1.0
     if user_input["is_late_night"]: rating += 0.5
     if user_input["transaction_method"] in ["Online", "Mobile"]: rating += 0.5
-    if true_prediction == "Fraudulent": rating += 0.5
+    if prediction == -1: rating += 0.5
     rating = min(5.0, round(rating, 1))
+
+    explanation_lines = [
+        f"- Transaction Amount: ${user_input['transaction_amount']} – higher amounts are often suspicious.",
+        f"- Account Age: {user_input['account_age_days']} days – newer accounts tend to have higher risk.",
+        f"- Login Attempts: {user_input['login_attempts']} – excessive login attempts raise red flags.",
+        f"- Time of Day: {user_input['time_of_day']} – late hours can indicate attempts to avoid detection.",
+        f"- Transaction Method: {user_input['transaction_method']} – remote methods can mask identity."
+    ]
 
     prompt = f"""
 Given the transaction data: {user_input},\nPredicted: {result} with a confidence score of {confidence_score}%,\nBehavioral Risk Rating: {rating}/5\nExplain these findings to the user in layman's terms.
@@ -249,33 +226,72 @@ Given the transaction data: {user_input},\nPredicted: {result} with a confidence
         "behavior_rating": rating,
         "email": account_owner_email,
         "input_df": input_df,
-        "explanation": explanation
+        "explanation": explanation,
+        "anomaly_insights": explanation_lines
     }
 
 if st.session_state.submitted:
     d = st.session_state.result_data
     st.markdown(f"### Prediction: **{d['result']}**")
-    st.markdown(f"**Confidence Level:** {d['confidence_score']}%")
+    st.markdown(f"**Confidence Level:** {d['confidence_score']}% Confident")
 
-    st.markdown("### 🧠 Behavioral Risk Rating: **" + str(d["behavior_rating"]) + " / 5**")
-    st.markdown(d["explanation"])
+    st.markdown("### \U0001f9e0 Behavioral Risk Rating Explanation and Score:")
+    st.markdown(f"""
+This score is computed based on the following weighted risk factors:
 
-    st.markdown("### 🔍 Anomaly Insights:")
-    for feature, value in d['input_df'].iloc[0].items():
-        st.markdown(f"- **{feature.replace('_', ' ').capitalize()}**: `{value:.2f}`")
+- **+1.0** if account is less than 90 days old  
+- **+0.5** if there are more than 3 login attempts  
+- **+1.0** if the transaction amount exceeds $5,000  
+- **+0.5** if the transaction occurred at night or evening  
+- **+0.5** if the transaction method is Online or Mobile  
+- **+0.5** if the model flagged this transaction as fraudulent  
 
-    st.markdown("### 📊 Adjusted Anomaly Heatmap:")
+**\U0001f9e0 Behavioral Risk Rating: {d['behavior_rating']} / 5**
+""")
+
+    st.markdown("### Explanation:")
+    st.markdown(d['explanation'])
+
+    st.markdown("### \U0001f50d Feature Highlights Contributing to Detection:")
+    for insight in d.get('anomaly_insights', []):
+        st.markdown(insight)
+
+    # Anomaly Heatmap Explanation
+    st.markdown("### \U0001f4ca Anomaly Heatmap (Model Scoring):")
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
     fig, ax = plt.subplots(figsize=(10, 6))
-    sns.heatmap(d['input_df'].T, annot=True, cmap="Reds", fmt=".2f", ax=ax, cbar_kws={'label': 'Feature Value'})
+    heat_data = d['input_df'].T
+    sns.heatmap(heat_data, annot=True, cmap="Reds", fmt=".2f", ax=ax, cbar_kws={'label': 'Feature Value'})
     st.pyplot(fig)
 
-    if d['result'] == "Fraudulent" and d['confidence_score'] >= 75 and d['email'] and not st.session_state.email_sent:
+    st.markdown("**\U0001f50d Heatmap Explanation:**")
+    for feature, value in d['input_df'].iloc[0].items():
+        explanation = ""
+        if feature == "transaction_amount":
+            explanation = "Higher values here often flag potential fraud due to large transfers or withdrawals."
+        elif feature == "account_age_days":
+            explanation = "Lower account age (fewer days active) is riskier and flagged more often."
+        elif feature == "login_attempts":
+            explanation = "An unusually high number of login attempts may imply unauthorized access attempts."
+        elif feature == "transaction_duration":
+            explanation = "Very short transaction times may suggest automated fraud or scripted behavior."
+        elif feature == "is_late_night":
+            explanation = "Late-night activity has a higher correlation with fraudulent behavior in historical data."
+        elif feature == "is_negative_balance_after":
+            explanation = "Ending in a negative balance often implies misuse or overdraft attempts."
+        else:
+            explanation = "This value was scored based on deviation from normal behavior learned by the model."
+        st.markdown(f"- **{feature.replace('_', ' ').capitalize()}**: `{value:.2f}` → {explanation}")
+
+    if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
         if st.button("📧 Send Fraud Alert Email"):
             tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
             email_sent = send_email_alert(
                 to_email=d['email'],
                 subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
-                message=f"""A transaction was flagged with a confidence level of {d['confidence_score']}%.
+                message=f"""A transaction was flagged with a **confidence level of {d['confidence_score']}%**.
 
 Behavioral Risk Rating: {d['behavior_rating']} / 5
 
