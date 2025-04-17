@@ -221,7 +221,7 @@ If referring to model certainty, explain it as the confidence level of detecting
 if st.session_state.submitted:
     d = st.session_state.result_data
     st.markdown(f"### Prediction: **{d['result']}**")
-    st.markdown(f"**Confidence Score:** {d['confidence_score']}%")
+    st.markdown(f"**Confidence Level:** {d['confidence_score']}% Confident")
 
     cluster_map = {
         0: "Low-risk cluster with consistent behavior and established transaction patterns.",
@@ -248,7 +248,7 @@ if st.session_state.submitted:
             email_sent = send_email_alert(
                 to_email=d['email'],
                 subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
-                message=f"""A transaction was flagged with a confidence score of {d['confidence_score']}%.
+                message=f"""A transaction was flagged with a **confidence level of {d['confidence_score']}%**.
 
 Behavioral Cluster: {d['behavior_cluster']} – {cluster_explanation}
 
