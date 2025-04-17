@@ -202,7 +202,6 @@ if submitted:
 if st.session_state.submitted:
     d = st.session_state.result_data
 
-    # ✅ Behavioral Score Calculation (+/- System)
     rating = 0.0
     explanation_bullets = []
 
@@ -227,7 +226,7 @@ if st.session_state.submitted:
 
     rating = round(min(max(rating, 0.0), 5.0), 1)
 
-    st.markdown("### 🧠 Behavioral Risk Rating Explanation and Score:")
+    st.markdown("### \U0001f9e0 Behavioral Risk Rating Explanation and Score:")
     st.markdown("""
 This score is computed based on the following weighted risk factors:
 
@@ -241,9 +240,9 @@ This score is computed based on the following weighted risk factors:
 - **+0.5 / –0.5** → Short duration (<2 min = +0.5, else –0.5)
 - **+0.5 / –0.5** → Young age (<20 = +0.5, else –0.5)
 """)
-st.markdown(f"🧠 **Behavioral Risk Rating: {rating} / 5**")
+    st.markdown(f"\U0001f9e0 **Behavioral Risk Rating: {rating} / 5**")
 
-        st.markdown("### 📊 Adjusted Anomaly Heatmap (Fraud Risk Based):")
+    st.markdown("### \U0001f4ca Adjusted Anomaly Heatmap (Fraud Risk Based):")
     fig, ax = plt.subplots(figsize=(10, 6))
     heat_data = d['input_df'].T.copy()
     mean_vals = X.mean()
@@ -253,8 +252,9 @@ st.markdown(f"🧠 **Behavioral Risk Rating: {rating} / 5**")
     cmap = sns.diverging_palette(240, 10, as_cmap=True)
     sns.heatmap(fraud_scores.to_frame(name='Fraud Likelihood Score'), annot=True, cmap=cmap, fmt=".2f", ax=ax, center=1.5, cbar_kws={'label': 'Fraud Likelihood Score'})
     ax.set_ylabel("Features")
+    st.pyplot(fig)
 
-    st.markdown("**🔍 Heatmap Explanation:**")
+    st.markdown("**\U0001f50d Heatmap Explanation:**")
     for feature, value in d['input_df'].iloc[0].items():
         explanation = "This value was scored based on deviation from normal behavior learned by the model."
         if feature == "transaction_amount":
@@ -272,11 +272,11 @@ st.markdown(f"🧠 **Behavioral Risk Rating: {rating} / 5**")
         st.markdown(f"- **{feature.replace('_', ' ').capitalize()}**: {value:.2f} → {explanation}")
 
     if d['result'] == "Fraudulent" and d['confidence_score'] >= 75 and d['email'] and not st.session_state.email_sent:
-        if st.button("📧 Send Fraud Alert Email"):
+        if st.button("\U0001f4e7 Send Fraud Alert Email"):
             tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
             email_sent = send_email_alert(
                 to_email=d['email'],
-                subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
+                subject="\U0001f6a8 FRAUD ALERT – Suspicious Transaction Detected",
                 message=f"""A transaction was flagged with a **confidence level of {d['confidence_score']}%**.
 
 Behavioral Risk Rating: {rating} / 5
@@ -290,7 +290,7 @@ Recommended Actions:
 - Monitor account activity immediately."""
             )
             if email_sent:
-                st.success("✅ Alert sent to account owner and admin.")
+                st.success("\u2705 Alert sent to account owner and admin.")
                 st.session_state.email_sent = True
             else:
-                st.error("❌ Email failed to send.")
+                st.error("\u274c Email failed to send.")
