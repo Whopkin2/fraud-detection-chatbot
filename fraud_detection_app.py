@@ -9,6 +9,8 @@ import numpy as np
 import smtplib
 from email.mime.text import MIMEText
 import re
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 st.set_page_config(page_title="Fraud Detector", layout="centered")
 load_dotenv()
@@ -188,14 +190,18 @@ if submitted:
     confidence_score = max(0.0, min(confidence_score, 100.0))
     result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
 
-    rating = 1.0
-    if user_input["account_age_days"] < 90: rating += 1.0
-    if user_input["login_attempts"] > 3: rating += 0.5
-    if user_input["transaction_amount"] > 5000: rating += 1.0
-    if user_input["is_late_night"]: rating += 0.5
-    if user_input["transaction_method"] in ["Online", "Mobile"]: rating += 0.5
-    if prediction == -1: rating += 0.5
-    rating = min(5.0, round(rating, 1))
+    # FULL behavioral rating
+    rating = 0.0
+    rating += 1.0 if user_input["account_age_days"] < 90 else -1.0
+    rating += 0.5 if user_input["login_attempts"] > 3 else -0.5
+    rating += 1.0 if user_input["transaction_amount"] > 5000 else -1.0
+    rating += 0.5 if user_input["is_late_night"] else -0.5
+    rating += 0.5 if user_input["transaction_method"] in ["Online", "Mobile"] else -0.5
+    rating += 0.5 if user_input["is_international"] else -0.5
+    rating += 0.5 if user_input["is_negative_balance_after"] else -0.5
+    rating += 0.5 if user_input["transaction_duration"] < 2 else -0.5
+    rating += 0.5 if user_input["customer_age"] < 20 else -0.5
+    rating = max(0.0, round(min(5.0, rating), 1))
 
     explanation_lines = [
         f"- Transaction Amount: ${user_input['transaction_amount']} – higher amounts are often suspicious.",
@@ -206,7 +212,10 @@ if submitted:
     ]
 
     prompt = f"""
-Given the transaction data: {user_input},\nPredicted: {result} with a confidence score of {confidence_score}%,\nBehavioral Risk Rating: {rating}/5\n"""
+Given the transaction data: {user_input},
+Predicted: {result} with a confidence score of {confidence_score}%,
+Behavioral Risk Rating: {rating}/5
+"""
 
     response = client.chat.completions.create(
         model="gpt-4",
@@ -234,40 +243,17 @@ if st.session_state.submitted:
     st.markdown(f"### Prediction: **{d['result']}**")
     st.markdown(f"**Confidence Level:** {d['confidence_score']}% Confident")
 
-    st.markdown("### \U0001f9e0 Behavioral Risk Rating Explanation and Score:")
-    st.markdown(f"""
-This score is computed based on the following weighted risk factors:
-
-- **+1.0** if account is less than 90 days old  
-- **+0.5** if there are more than 3 login attempts  
-- **+1.0** if the transaction amount exceeds $5,000  
-- **+0.5** if the transaction occurred at night or evening  
-- **+0.5** if the transaction method is Online or Mobile  
-- **+0.5** if the model flagged this transaction as fraudulent  
-
-**\U0001f9e0 Behavioral Risk Rating: {d['behavior_rating']} / 5**
-""")
-
-    st.markdown("### Explanation:")
-    st.markdown(d['explanation'])
-
-    st.markdown("### \U0001f50d Feature Highlights Contributing to Detection:")
-    for insight in d.get('anomaly_insights', []):
-        st.markdown(insight)
-
-    # Anomaly Heatmap Explanation
     st.markdown("### \U0001f4ca Anomaly Heatmap (Model Scoring):")
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-
     fig, ax = plt.subplots(figsize=(10, 6))
-    heat_data = d['input_df'].T
-    sns.heatmap(heat_data, annot=True, cmap="Reds", fmt=".2f", ax=ax, cbar_kws={'label': 'Feature Value'})
+    heat_data = d['input_df'].T.copy()
+    fraud_scores = heat_data.apply(lambda x: abs(x - X.mean()) / (X.std() + 1e-5), axis=1)
+    fraud_scores = fraud_scores.clip(0, 3)
+    sns.heatmap(fraud_scores.to_frame(name='Fraud Risk'), annot=True, cmap="coolwarm_r", fmt=".2f", ax=ax, cbar_kws={'label': 'Fraud Likelihood'})
     st.pyplot(fig)
 
     st.markdown("**\U0001f50d Heatmap Explanation:**")
     for feature, value in d['input_df'].iloc[0].items():
-        explanation = ""
+        explanation = "This value was scored based on deviation from normal behavior learned by the model."
         if feature == "transaction_amount":
             explanation = "Higher values here often flag potential fraud due to large transfers or withdrawals."
         elif feature == "account_age_days":
@@ -280,16 +266,14 @@ This score is computed based on the following weighted risk factors:
             explanation = "Late-night activity has a higher correlation with fraudulent behavior in historical data."
         elif feature == "is_negative_balance_after":
             explanation = "Ending in a negative balance often implies misuse or overdraft attempts."
-        else:
-            explanation = "This value was scored based on deviation from normal behavior learned by the model."
         st.markdown(f"- **{feature.replace('_', ' ').capitalize()}**: `{value:.2f}` → {explanation}")
 
     if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
-        if st.button("📧 Send Fraud Alert Email"):
+        if st.button("\U0001f4e7 Send Fraud Alert Email"):
             tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
             email_sent = send_email_alert(
                 to_email=d['email'],
-                subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
+                subject="\U0001f6a8 FRAUD ALERT – Suspicious Transaction Detected",
                 message=f"""A transaction was flagged with a **confidence level of {d['confidence_score']}%**.
 
 Behavioral Risk Rating: {d['behavior_rating']} / 5
@@ -303,7 +287,7 @@ Recommended Actions:
 - Monitor account activity immediately."""
             )
             if email_sent:
-                st.success("✅ Alert sent to account owner and admin.")
+                st.success("\u2705 Alert sent to account owner and admin.")
                 st.session_state.email_sent = True
             else:
-                st.error("❌ Email failed to send.")
+                st.error("\u274c Email failed to send.")
