@@ -54,7 +54,6 @@ X_scored["is_fraud"] = isolation_model.predict(X)
 kmeans = KMeans(n_clusters=4, random_state=42)
 X_scored["behavior_cluster"] = kmeans.fit_predict(X)
 
-# Utility Functions
 def sanitize_numeric(value):
     if isinstance(value, str):
         value = value.replace("$", "").replace(",", "").strip()
@@ -135,7 +134,6 @@ if "email_sent" not in st.session_state:
 
 st.markdown("## 🕵️ <span style='font-family: Arial;'>Fraud Detection Chatbot</span>", unsafe_allow_html=True)
 
-# Input Form
 with st.form("user_input_form"):
     st.markdown("### <span style='font-family: Arial;'>Enter transaction data:</span>", unsafe_allow_html=True)
     user_input = {}
@@ -159,7 +157,6 @@ with st.form("user_input_form"):
     account_owner_email = st.text_input("Account owner's email (for alert):")
     submitted = st.form_submit_button("Analyze Transaction")
 
-# On Submit
 if submitted:
     user_input = standardize_categoricals(user_input)
     user_input["account_age_days"] = parse_account_age(user_input.get("account_age_days", "1 year"))
@@ -188,7 +185,6 @@ if submitted:
     raw_score = isolation_model.decision_function(input_df)[0]
     confidence_score = round(((-raw_score + 0.5) / 1.0) * 100, 2)
     confidence_score = max(0.0, min(confidence_score, 100.0))
-
     behavior_cluster = int(kmeans.predict(input_df)[0])
     result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
 
@@ -198,7 +194,8 @@ and a model that flagged it as {result} with a confidence score of {confidence_s
 evaluate the transaction in detail. Include account age, login attempts, transaction method and duration,
 and explain how these factors influence the model's decision.
 
-Avoid using the term "fraud score" — refer to it only as confidence score.
+Important: Do NOT use the term "fraud score" at all in your response. Only use "confidence score". 
+If referring to model certainty, explain it as the confidence level of detecting potential fraud.
 """
 
     response = client.chat.completions.create(
@@ -221,7 +218,6 @@ Avoid using the term "fraud score" — refer to it only as confidence score.
         "explanation": explanation
     }
 
-# Output Display
 if st.session_state.submitted:
     d = st.session_state.result_data
     st.markdown(f"### Prediction: **{d['result']}**")
