@@ -9,6 +9,8 @@ import numpy as np
 import smtplib
 from email.mime.text import MIMEText
 import re
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 st.set_page_config(page_title="Fraud Detector", layout="centered")
 load_dotenv()
@@ -89,6 +91,19 @@ def standardize_categoricals(user_input):
         val = user_input["is_international"].strip().lower()
         user_input["is_international"] = "Yes" if val in ["yes", "y", "true", "1"] else "No"
     return user_input
+
+def compute_behavioral_risk_score(user_input):
+    score = 0.0
+    score += 1.0 if user_input["account_age_days"] < 90 else -1.0
+    score += 0.5 if user_input["login_attempts"] > 3 else -0.5
+    score += 1.0 if user_input["transaction_amount"] > 5000 else -1.0
+    score += 0.5 if user_input["is_late_night"] == 1 else -0.5
+    score += 0.5 if user_input["transaction_method"] in ["Online", "Mobile"] else -0.5
+    score += 0.5 if user_input["is_international"] == "Yes" else -0.5
+    score += 0.5 if user_input["is_negative_balance_after"] == 1 else -0.5
+    score += 0.5 if user_input["transaction_duration"] < 2 else -0.5
+    score += 0.5 if user_input["customer_age"] < 20 else -0.5
+    return max(0.0, min(5.0, round(score, 2)))
 
 def send_email_alert(to_email, subject, message):
     try:
@@ -188,7 +203,7 @@ if submitted:
     confidence_score = max(0.0, min(confidence_score, 100.0))
     result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
 
-rating = compute_behavioral_risk_score(user_input)
+    rating = compute_behavioral_risk_score(user_input)
 
     explanation_lines = [
         f"- Transaction Amount: ${user_input['transaction_amount']} – higher amounts are often suspicious.",
@@ -222,16 +237,15 @@ Given the transaction data: {user_input},\nPredicted: {result} with a confidence
         "explanation": explanation,
         "anomaly_insights": explanation_lines
     }
-
 if st.session_state.submitted:
     d = st.session_state.result_data
     st.markdown(f"### Prediction: **{d['result']}**")
     st.markdown(f"**Confidence Level:** {d['confidence_score']}% Confident")
 
     st.markdown("### 🧠 Behavioral Risk Rating (+/– System)")
-st.markdown(f"**Behavioral Risk Rating: {d['behavior_rating']} / 5**")
+    st.markdown(f"**Behavioral Risk Rating: {d['behavior_rating']} / 5**")
 
-st.markdown(\"\"\"
+    st.markdown("""
 Each factor contributes + or – to the behavioral score based on risk conditions:
 
 - **+1.0 / –1.0** → Account age (<90 days = +1.0, otherwise –1.0)  
@@ -243,27 +257,22 @@ Each factor contributes + or – to the behavioral score based on risk condition
 - **+0.5 / –0.5** → Negative balance = +0.5, otherwise –0.5  
 - **+0.5 / –0.5** → Short duration (<2 min = +0.5, else –0.5)  
 - **+0.5 / –0.5** → Young age (<20 = +0.5, else –0.5)  
-\"\"\")
-
+""")
 
     st.markdown("### Explanation:")
     st.markdown(d['explanation'])
 
-    st.markdown("### \U0001f50d Feature Highlights Contributing to Detection:")
+    st.markdown("### 🔍 Feature Highlights Contributing to Detection:")
     for insight in d.get('anomaly_insights', []):
         st.markdown(insight)
 
-    # Anomaly Heatmap Explanation
-    st.markdown("### \U0001f4ca Anomaly Heatmap (Model Scoring):")
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-
+    st.markdown("### 📊 Adjusted Anomaly Heatmap (Fraud Risk Based):")
     fig, ax = plt.subplots(figsize=(10, 6))
     heat_data = d['input_df'].T
     sns.heatmap(heat_data, annot=True, cmap="Reds", fmt=".2f", ax=ax, cbar_kws={'label': 'Feature Value'})
     st.pyplot(fig)
 
-    st.markdown("**\U0001f50d Heatmap Explanation:**")
+    st.markdown("**🔍 Heatmap Explanation:**")
     for feature, value in d['input_df'].iloc[0].items():
         explanation = ""
         if feature == "transaction_amount":
@@ -282,6 +291,7 @@ Each factor contributes + or – to the behavioral score based on risk condition
             explanation = "This value was scored based on deviation from normal behavior learned by the model."
         st.markdown(f"- **{feature.replace('_', ' ').capitalize()}**: `{value:.2f}` → {explanation}")
 
+    # EMAIL ALERT TRIGGER SECTION
     if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
         if st.button("📧 Send Fraud Alert Email"):
             tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
