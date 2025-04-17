@@ -257,14 +257,14 @@ if st.session_state.submitted:
                           "Large transaction amount" if user["transaction_amount"] > 5000 else "Amount is modest"))
     score_factors.append(("Time of Day", +0.5 if user["is_late_night"] == 1 else -0.5,
                           "Suspicious late-night timing" if user["is_late_night"] == 1 else "Normal hours"))
-    score_factors.append(("Method", +0.5 if user["transaction_method"] in ["Online", "Mobile"] else -0.5,
+    score_factors.append(("Method", +0.5 if user["transaction_method"] in ["Online", "Mobile", "Wire"] else -0.5,
                           "Remote transaction method" if user["transaction_method"] in ["Online", "Mobile", "Wire"] else "In-person method"))
     score_factors.append(("International", +0.5 if user["is_international"] == "Yes" else -0.5,
                           "International transaction" if user["is_international"] == "Yes" else "Domestic transaction"))
     score_factors.append(("Negative Balance", +0.5 if user["is_negative_balance_after"] == 1 else -0.5,
                           "Ends in negative balance" if user["is_negative_balance_after"] == 1 else "Balance is sufficient"))
-    score_factors.append(("Short Duration", +0.5 if user["transaction_duration"] < 2 else -0.5,
-                          "Suspiciously fast transaction" if user["transaction_duration"] < 2 else "Normal duration"))
+    score_factors.append(("Short Duration", +0.5 if user["transaction_duration"] <= 2 else -0.5,
+                          "Suspiciously fast transaction" if user["transaction_duration"] <= 2 else "Normal duration"))
     score_factors.append(("Young Age", +0.5 if user["customer_age"] < 24 else -0.5,
                           "Very young customer" if user["customer_age"] < 24 else "Customer age is mature"))
 
