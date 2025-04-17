@@ -108,6 +108,55 @@ def calculate_confidence_from_rating(score):
     else:
         return 10.0
 
+def compute_behavioral_risk_score(user):
+    score = 0
+    if user["account_age_days"] < 90:
+        score += 1.0
+    else:
+        score -= 1.0
+
+    if user["login_attempts"] > 3:
+        score += 0.5
+    else:
+        score -= 0.5
+
+    if user["transaction_amount"] > 5000:
+        score += 1.0
+    else:
+        score -= 1.0
+
+    if user["is_late_night"] == 1:
+        score += 0.5
+    else:
+        score -= 0.5
+
+    if user["transaction_method"] in ["Online", "Mobile", "Wire"]:
+        score += 0.5
+    else:
+        score -= 0.5
+
+    if user["is_international"] == "Yes":
+        score += 0.5
+    else:
+        score -= 0.5
+
+    if user["is_negative_balance_after"] == 1:
+        score += 0.5
+    else:
+        score -= 0.5
+
+    if user["transaction_duration"] <= 2:
+        score += 0.5
+    else:
+        score -= 0.5
+
+    if user["customer_age"] < 24:
+        score += 0.5
+    else:
+        score -= 0.5
+
+    return max(0, min(5, round(score, 2)))
+
 def send_email_alert(to_email, subject, message):
     try:
         sender_email = os.getenv("ALERT_SENDER_EMAIL")
@@ -141,7 +190,7 @@ if "result_data" not in st.session_state:
 if "email_sent" not in st.session_state:
     st.session_state.email_sent = False
 
-st.markdown("## \U0001f575️ <span style='font-family: Arial;'>Fraud Detection AI Tool</span>", unsafe_allow_html=True)
+st.markdown("## 🕵️ <span style='font-family: Arial;'>Fraud Detection AI Tool</span>", unsafe_allow_html=True)
 
 with st.form("user_input_form"):
     st.markdown("### <span style='font-family: Arial;'>Enter transaction data:</span>", unsafe_allow_html=True)
@@ -206,28 +255,6 @@ if submitted:
     prediction = isolation_model.predict(input_df)[0]
     result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
 
-
-    explanation_lines = [
-        f"- Transaction Amount: ${user_input['transaction_amount']} – higher amounts are often suspicious.",
-        f"- Account Age: {user_input['account_age_days']} days – newer accounts tend to have higher risk.",
-        f"- Login Attempts: {user_input['login_attempts']} – excessive login attempts raise red flags.",
-        f"- Time of Day: {user_input['time_of_day']} – late hours can indicate attempts to avoid detection.",
-        f"- Transaction Method: {user_input['transaction_method']} – remote methods can mask identity."
-    ]
-
-    prompt = f"""
-Given the transaction data: {user_input},\nPredicted: {result} with a confidence score of {confidence_score}%,\nBehavioral Risk Rating: {rating}/5\nExplain these findings to the user in layman's terms.
-"""
-
-    response = client.chat.completions.create(
-        model="gpt-4",
-        messages=[
-            {"role": "system", "content": "You are a helpful fraud risk advisor who explains AI-based anomaly detection decisions."},
-            {"role": "user", "content": prompt}
-        ]
-    )
-    explanation = response.choices[0].message.content
-
     st.session_state.submitted = True
     st.session_state.result_data = {
         "user_input": user_input,
@@ -235,44 +262,30 @@ Given the transaction data: {user_input},\nPredicted: {result} with a confidence
         "confidence_score": confidence_score,
         "behavior_rating": rating,
         "email": account_owner_email,
-        "input_df": input_df,
-        "explanation": explanation,
-        "anomaly_insights": explanation_lines
+        "input_df": input_df
     }
+
 if st.session_state.submitted:
     d = st.session_state.result_data
     st.markdown(f"### Prediction: **{d['result']}**")
     st.markdown(f"**Confidence Level:** {d['confidence_score']}% Confident")
 
     st.markdown("### 🧠 Behavioral Risk Rating Breakdown")
-
     score = d['behavior_rating']
     user = d['user_input']
-
-    # Detailed breakdown with reasoning
     score_factors = []
 
-    score_factors.append(("Account Age", +1.0 if user["account_age_days"] < 90 else -1.0,
-                          "Account is new" if user["account_age_days"] < 90 else "Account is established"))
-    score_factors.append(("Login Attempts", +0.5 if user["login_attempts"] > 3 else -0.5,
-                          "Too many login attempts" if user["login_attempts"] > 3 else "Login count is normal"))
-    score_factors.append(("Transaction Amount", +1.0 if user["transaction_amount"] > 5000 else -1.0,
-                          "Large transaction amount" if user["transaction_amount"] > 5000 else "Amount is modest"))
-    score_factors.append(("Time of Day", +0.5 if user["is_late_night"] == 1 else -0.5,
-                          "Suspicious late-night timing" if user["is_late_night"] == 1 else "Normal hours"))
-    score_factors.append(("Method", +0.5 if user["transaction_method"] in ["Online", "Mobile", "Wire"] else -0.5,
-                          "Remote transaction method" if user["transaction_method"] in ["Online", "Mobile", "Wire"] else "In-person method"))
-    score_factors.append(("International", +0.5 if user["is_international"] == "Yes" else -0.5,
-                          "International transaction" if user["is_international"] == "Yes" else "Domestic transaction"))
-    score_factors.append(("Negative Balance", +0.5 if user["is_negative_balance_after"] == 1 else -0.5,
-                          "Ends in negative balance" if user["is_negative_balance_after"] == 1 else "Balance is sufficient"))
-    score_factors.append(("Short Duration", +0.5 if user["transaction_duration"] <= 2 else -0.5,
-                          "Suspiciously fast transaction" if user["transaction_duration"] <= 2 else "Normal duration"))
-    score_factors.append(("Young Age", +0.5 if user["customer_age"] < 24 else -0.5,
-                          "Very young customer" if user["customer_age"] < 24 else "Customer age is mature"))
+    score_factors.append(("Account Age", +1.0 if user["account_age_days"] < 90 else -1.0, "Account is new" if user["account_age_days"] < 90 else "Account is established"))
+    score_factors.append(("Login Attempts", +0.5 if user["login_attempts"] > 3 else -0.5, "Too many login attempts" if user["login_attempts"] > 3 else "Login count is normal"))
+    score_factors.append(("Transaction Amount", +1.0 if user["transaction_amount"] > 5000 else -1.0, "Large transaction amount" if user["transaction_amount"] > 5000 else "Amount is modest"))
+    score_factors.append(("Time of Day", +0.5 if user["is_late_night"] == 1 else -0.5, "Suspicious late-night timing" if user["is_late_night"] == 1 else "Normal hours"))
+    score_factors.append(("Method", +0.5 if user["transaction_method"] in ["Online", "Mobile", "Wire"] else -0.5, "Remote transaction method" if user["transaction_method"] in ["Online", "Mobile", "Wire"] else "In-person method"))
+    score_factors.append(("International", +0.5 if user["is_international"] == "Yes" else -0.5, "International transaction" if user["is_international"] == "Yes" else "Domestic transaction"))
+    score_factors.append(("Negative Balance", +0.5 if user["is_negative_balance_after"] == 1 else -0.5, "Ends in negative balance" if user["is_negative_balance_after"] == 1 else "Balance is sufficient"))
+    score_factors.append(("Short Duration", +0.5 if user["transaction_duration"] <= 2 else -0.5, "Suspiciously fast transaction" if user["transaction_duration"] <= 2 else "Normal duration"))
+    score_factors.append(("Young Age", +0.5 if user["customer_age"] < 24 else -0.5, "Very young customer" if user["customer_age"] < 24 else "Customer age is mature"))
 
     st.markdown(f"**Total Behavioral Risk Rating: {score} / 5**")
-
     for factor, impact, reason in score_factors:
         sign = "+" if impact > 0 else "–"
         st.markdown(f"- **{factor}**: {sign}{abs(impact)} → _{reason}_")
@@ -285,9 +298,8 @@ if st.session_state.submitted:
         summary = "Low behavioral risk detected. Transaction appears typical."
 
     st.markdown(f"📌 **Summary**: {summary}")
-
     st.markdown("### Explanation:")
-    st.markdown(d['explanation'])
+    st.markdown(d.get('explanation', 'Explanation not available.'))
 
     st.markdown("### 🔍 Feature Highlights Contributing to Detection:")
     for insight in d.get('anomaly_insights', []):
@@ -318,10 +330,10 @@ if st.session_state.submitted:
             explanation = "This value was scored based on deviation from normal behavior learned by the model."
         st.markdown(f"- **{feature.replace('_', ' ').capitalize()}**: `{value:.2f}` → {explanation}")
 
-    # EMAIL ALERT TRIGGER SECTION
     if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
         if st.button("📧 Send Fraud Alert Email"):
-            tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
+            tx = "
+".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
             email_sent = send_email_alert(
                 to_email=d['email'],
                 subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
@@ -341,4 +353,36 @@ Recommended Actions:
                 st.success("✅ Alert sent to account owner and admin.")
                 st.session_state.email_sent = True
             else:
-                st.error("❌ Email failed to send.")
+                st.error("❌ Email failed to send.")    d = st.session_state.result_data
+    st.markdown(f"### Prediction: **{d['result']}**")
+    st.markdown(f"**Confidence Level:** {d['confidence_score']}% Confident")
+    st.markdown(f"**Behavioral Risk Rating:** {d['behavior_rating']} / 5")
+
+    st.markdown("### 📊 Anomaly Heatmap:")
+    fig, ax = plt.subplots(figsize=(10, 6))
+    heat_data = d['input_df'].T
+    sns.heatmap(heat_data, annot=True, cmap="Reds", fmt=".2f", ax=ax, cbar_kws={'label': 'Feature Value'})
+    st.pyplot(fig)
+
+    if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
+        if st.button("📧 Send Fraud Alert Email"):
+            tx = "
+".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
+            email_sent = send_email_alert(
+                to_email=d['email'],
+                subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
+                message=f"""A transaction was flagged with a **confidence level of {d['confidence_score']}%**.
+
+Behavioral Risk Rating: {d['behavior_rating']} / 5
+
+Transaction Details:
+{tx}
+
+Recommended Actions:
+- Verify this transaction
+- Contact your bank if unauthorized
+- Monitor account activity immediately."""
+            )
+            if email_sent:
+                st.success("✅ Alert sent to account owner and admin.")
+                st.session_state.email_sent = True
