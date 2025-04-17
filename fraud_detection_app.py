@@ -5,11 +5,12 @@ import os
 from dotenv import load_dotenv
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import LabelEncoder
+from sklearn.cluster import KMeans
+from sklearn.metrics.pairwise import euclidean_distances
 import numpy as np
 import smtplib
 from email.mime.text import MIMEText
 import re
-from scipy.special import expit  # For sigmoid transformation
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -27,7 +28,6 @@ def load_data():
 data = load_data()
 data = data.drop(columns=["transaction_id", "branch_code", "device_id"])
 
-# Feature Engineering
 data["is_negative_balance_after"] = (data["balance_after_transaction"] < 0).astype(int)
 data["is_late_night"] = data["time_of_day"].apply(lambda x: 1 if str(x).lower() in ["night", "evening"] else 0)
 
@@ -46,8 +46,18 @@ features = [
 ]
 X = data[features]
 
+# Train Isolation Forest model
 isolation_model = IsolationForest(contamination=0.05, n_estimators=200, max_features=0.9, random_state=42)
 isolation_model.fit(X)
+
+# Train KMeans for behavioral clustering
+kmeans = KMeans(n_clusters=5, random_state=42)
+data["cluster"] = kmeans.fit_predict(X)
+
+# Calculate anomaly scores and cluster stats
+data["anomaly_score"] = isolation_model.decision_function(X)
+cluster_centers = kmeans.cluster_centers_
+cluster_stats = data.groupby("cluster")["anomaly_score"].agg(["mean", "std"]).reset_index()
 
 def sanitize_numeric(value):
     if isinstance(value, str):
@@ -188,9 +198,21 @@ if submitted:
     prediction = isolation_model.predict(input_df)[0]
     raw_score = isolation_model.decision_function(input_df)[0]
 
-    # 🔁 Updated logic: use sigmoid to scale more generously
-    sigmoid_score = expit(-raw_score * 5)  # scaling factor improves spread
-    confidence_score = round(sigmoid_score * 100, 2)
+    # Cluster-based confidence calculation
+    input_vector = input_df.values
+    dists = euclidean_distances(cluster_centers, input_vector)
+    closest_cluster = np.argmin(dists)
+    dist_to_center = dists[closest_cluster][0]
+
+    cluster_mean = cluster_stats.loc[closest_cluster, "mean"]
+    cluster_std = cluster_stats.loc[closest_cluster, "std"]
+
+    if dist_to_center < 0.5 and cluster_std < 0.2:
+        confidence_score = 95.0 if prediction != -1 else 85.0
+    elif cluster_std > 0.6:
+        confidence_score = 55.0 if prediction != -1 else 45.0
+    else:
+        confidence_score = 70.0 if prediction != -1 else 60.0
 
     result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
     true_prediction = result
@@ -235,43 +257,14 @@ if st.session_state.submitted:
     st.markdown(f"### Prediction: **{d['result']}**")
     st.markdown(f"**Confidence Level:** {d['confidence_score']}%")
 
-    st.markdown("### 🧠 Behavioral Risk Rating Explanation and Score:")
-    st.markdown(f"""
-**Weighted Risk Factors Used:**
-
-- +1.0 if account is under 90 days old  
-- +0.5 if login attempts > 3  
-- +1.0 if transaction > $5,000  
-- +0.5 if done at night/evening  
-- +0.5 if done Online or Mobile  
-- +0.5 if model flagged it as fraud
-
-**🧠 Behavioral Risk Rating: {d['behavior_rating']} / 5**
-""")
-
-    st.markdown("### Explanation:")
+    st.markdown("### 🧠 Behavioral Risk Rating: **" + str(d["behavior_rating"]) + " / 5**")
     st.markdown(d["explanation"])
 
     st.markdown("### 🔍 Anomaly Insights:")
     for feature, value in d['input_df'].iloc[0].items():
-        explanation = ""
-        if feature == "transaction_amount":
-            explanation = "Higher values can indicate fraud due to large withdrawals."
-        elif feature == "account_age_days":
-            explanation = "Newer accounts are more likely to be involved in fraud."
-        elif feature == "login_attempts":
-            explanation = "Multiple login attempts may indicate forced access."
-        elif feature == "transaction_duration":
-            explanation = "Very short durations could suggest automation or bots."
-        elif feature == "is_late_night":
-            explanation = "Late-night actions tend to correlate with higher fraud."
-        elif feature == "is_negative_balance_after":
-            explanation = "Ending with a negative balance may suggest risky behavior."
-        else:
-            explanation = "Scored based on deviation from usual behavior."
-        st.markdown(f"- **{feature.replace('_', ' ').capitalize()}**: `{value:.2f}` → {explanation}")
+        st.markdown(f"- **{feature.replace('_', ' ').capitalize()}**: `{value:.2f}`")
 
-    st.markdown("### 📊 Adjusted Anomaly Heatmap (Fraud Risk Based):")
+    st.markdown("### 📊 Adjusted Anomaly Heatmap:")
     fig, ax = plt.subplots(figsize=(10, 6))
     sns.heatmap(d['input_df'].T, annot=True, cmap="Reds", fmt=".2f", ax=ax, cbar_kws={'label': 'Feature Value'})
     st.pyplot(fig)
