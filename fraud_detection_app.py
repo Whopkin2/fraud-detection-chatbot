@@ -92,18 +92,21 @@ def standardize_categoricals(user_input):
         user_input["is_international"] = "Yes" if val in ["yes", "y", "true", "1"] else "No"
     return user_input
 
-def compute_behavioral_risk_score(user_input):
-    score = 0.0
-    score += 1.0 if user_input["account_age_days"] < 90 else -1.0
-    score += 0.5 if user_input["login_attempts"] > 3 else -0.5
-    score += 1.0 if user_input["transaction_amount"] > 5000 else -1.0
-    score += 0.5 if user_input["is_late_night"] == 1 else -0.5
-    score += 0.5 if user_input["transaction_method"] in ["Online", "Mobile", "Wire"] else -0.5
-    score += 0.5 if user_input["is_international"] == "Yes" else -0.5
-    score += 0.5 if user_input["is_negative_balance_after"] == 1 else -0.5
-    score += 0.5 if user_input["transaction_duration"] < 2 else -0.5
-    score += 0.5 if user_input["customer_age"] < 24 else -0.5
-    return max(0.0, min(5.0, round(score, 2)))
+def calculate_confidence_from_rating(score):
+    if score >= 5.0:
+        return 95.0
+    elif score >= 4.0:
+        return 85.0
+    elif score >= 3.5:
+        return 75.0
+    elif score >= 2.5:
+        return 60.0
+    elif score >= 2.0:
+        return 50.0
+    elif score >= 1.0:
+        return 30.0
+    else:
+        return 10.0
 
 def send_email_alert(to_email, subject, message):
     try:
