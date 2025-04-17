@@ -331,39 +331,6 @@ if st.session_state.submitted:
         st.markdown(f"- **{feature.replace('_', ' ').capitalize()}**: `{value:.2f}` → {explanation}")
 
     if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
-        if st.button("📧 Send Fraud Alert Email"):
-           tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
-            email_sent = send_email_alert(
-                to_email=d['email'],
-                subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
-                message=f"""A transaction was flagged with a **confidence level of {d['confidence_score']}%**.
-
-Behavioral Risk Rating: {d['behavior_rating']} / 5
-
-Transaction Details:
-{tx}
-
-Recommended Actions:
-- Verify this transaction
-- Contact your bank if unauthorized
-- Monitor account activity immediately."""
-            )
-            if email_sent:
-                st.success("✅ Alert sent to account owner and admin.")
-                st.session_state.email_sent = True
-            else:
-                st.error("❌ Email failed to send.")
-    st.markdown(f"### Prediction: **{d['result']}**")
-    st.markdown(f"**Confidence Level:** {d['confidence_score']}% Confident")
-    st.markdown(f"**Behavioral Risk Rating:** {d['behavior_rating']} / 5")
-
-    st.markdown("### 📊 Anomaly Heatmap:")
-    fig, ax = plt.subplots(figsize=(10, 6))
-    heat_data = d['input_df'].T
-    sns.heatmap(heat_data, annot=True, cmap="Reds", fmt=".2f", ax=ax, cbar_kws={'label': 'Feature Value'})
-    st.pyplot(fig)
-
-  if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
     if st.button("📧 Send Fraud Alert Email"):
         tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
         email_sent = send_email_alert(
@@ -386,4 +353,4 @@ Recommended Actions:
             st.session_state.email_sent = True
         else:
             st.error("❌ Email failed to send.")
-  
+
