@@ -9,6 +9,8 @@ import numpy as np
 import smtplib
 from email.mime.text import MIMEText
 import re
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 st.set_page_config(page_title="Fraud Detector", layout="centered")
 load_dotenv()
@@ -24,7 +26,6 @@ def load_data():
 data = load_data()
 data = data.drop(columns=["transaction_id", "branch_code", "device_id"])
 
-# Feature Engineering
 data["is_negative_balance_after"] = (data["balance_after_transaction"] < 0).astype(int)
 data["is_late_night"] = data["time_of_day"].apply(lambda x: 1 if str(x).lower() in ["night", "evening"] else 0)
 
@@ -113,7 +114,7 @@ def send_email_alert(to_email, subject, message):
 
         return True
     except Exception as e:
-        st.error(f"\u274c Email alert failed: {e}")
+        st.error(f"❌ Email alert failed: {e}")
         return False
 
 if "submitted" not in st.session_state:
@@ -123,10 +124,10 @@ if "result_data" not in st.session_state:
 if "email_sent" not in st.session_state:
     st.session_state.email_sent = False
 
-st.markdown("## \U0001f575️ <span style='font-family: Arial;'>Fraud Detection Chatbot</span>", unsafe_allow_html=True)
+st.markdown("## 🕵️‍♂️ <span style='font-family: Arial;'>Fraud Detection Chatbot</span>", unsafe_allow_html=True)
 
 with st.form("user_input_form"):
-    st.markdown("### <span style='font-family: Arial;'>Enter transaction data:</span>", unsafe_allow_html=True)
+    st.markdown("### Enter transaction data:", unsafe_allow_html=True)
     user_input = {}
     for col in features:
         label = col.replace('_', ' ').capitalize()
@@ -188,22 +189,18 @@ if submitted:
     confidence_score = max(0.0, min(confidence_score, 100.0))
     result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
 
-    rating = 1.0
+    true_prediction = result
+    if result == "Fraudulent" and confidence_score < 65:
+        result = "Not Fraudulent (Low Confidence)"
+
+    rating = 0.0
     if user_input["account_age_days"] < 90: rating += 1.0
     if user_input["login_attempts"] > 3: rating += 0.5
     if user_input["transaction_amount"] > 5000: rating += 1.0
     if user_input["is_late_night"]: rating += 0.5
     if user_input["transaction_method"] in ["Online", "Mobile"]: rating += 0.5
-    if prediction == -1: rating += 0.5
+    if true_prediction == "Fraudulent": rating += 0.5
     rating = min(5.0, round(rating, 1))
-
-    explanation_lines = [
-        f"- Transaction Amount: ${user_input['transaction_amount']} – higher amounts are often suspicious.",
-        f"- Account Age: {user_input['account_age_days']} days – newer accounts tend to have higher risk.",
-        f"- Login Attempts: {user_input['login_attempts']} – excessive login attempts raise red flags.",
-        f"- Time of Day: {user_input['time_of_day']} – late hours can indicate attempts to avoid detection.",
-        f"- Transaction Method: {user_input['transaction_method']} – remote methods can mask identity."
-    ]
 
     prompt = f"""
 Given the transaction data: {user_input},\nPredicted: {result} with a confidence score of {confidence_score}%,\nBehavioral Risk Rating: {rating}/5\nExplain these findings to the user in layman's terms.
@@ -226,72 +223,62 @@ Given the transaction data: {user_input},\nPredicted: {result} with a confidence
         "behavior_rating": rating,
         "email": account_owner_email,
         "input_df": input_df,
-        "explanation": explanation,
-        "anomaly_insights": explanation_lines
+        "explanation": explanation
     }
 
 if st.session_state.submitted:
     d = st.session_state.result_data
     st.markdown(f"### Prediction: **{d['result']}**")
-    st.markdown(f"**Confidence Level:** {d['confidence_score']}% Confident")
+    st.markdown(f"**Confidence Level:** {d['confidence_score']}%")
 
-    st.markdown("### \U0001f9e0 Behavioral Risk Rating Explanation and Score:")
+    st.markdown("### 🧠 Behavioral Risk Rating Explanation and Score:")
     st.markdown(f"""
-This score is computed based on the following weighted risk factors:
+**Weighted Risk Factors Used:**
 
-- **+1.0** if account is less than 90 days old  
-- **+0.5** if there are more than 3 login attempts  
-- **+1.0** if the transaction amount exceeds $5,000  
-- **+0.5** if the transaction occurred at night or evening  
-- **+0.5** if the transaction method is Online or Mobile  
-- **+0.5** if the model flagged this transaction as fraudulent  
+- +1.0 if account is under 90 days old  
+- +0.5 if login attempts > 3  
+- +1.0 if transaction > $5,000  
+- +0.5 if done at night/evening  
+- +0.5 if done Online or Mobile  
+- +0.5 if model flagged it as fraud
 
-**\U0001f9e0 Behavioral Risk Rating: {d['behavior_rating']} / 5**
+**🧠 Behavioral Risk Rating: {d['behavior_rating']} / 5**
 """)
 
     st.markdown("### Explanation:")
-    st.markdown(d['explanation'])
+    st.markdown(d["explanation"])
 
-    st.markdown("### \U0001f50d Feature Highlights Contributing to Detection:")
-    for insight in d.get('anomaly_insights', []):
-        st.markdown(insight)
-
-    # Anomaly Heatmap Explanation
-    st.markdown("### \U0001f4ca Anomaly Heatmap (Model Scoring):")
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-    heat_data = d['input_df'].T
-    sns.heatmap(heat_data, annot=True, cmap="Reds", fmt=".2f", ax=ax, cbar_kws={'label': 'Feature Value'})
-    st.pyplot(fig)
-
-    st.markdown("**\U0001f50d Heatmap Explanation:**")
+    st.markdown("### 🔍 Anomaly Insights:")
     for feature, value in d['input_df'].iloc[0].items():
         explanation = ""
         if feature == "transaction_amount":
-            explanation = "Higher values here often flag potential fraud due to large transfers or withdrawals."
+            explanation = "Higher values can indicate fraud due to large withdrawals."
         elif feature == "account_age_days":
-            explanation = "Lower account age (fewer days active) is riskier and flagged more often."
+            explanation = "Newer accounts are more likely to be involved in fraud."
         elif feature == "login_attempts":
-            explanation = "An unusually high number of login attempts may imply unauthorized access attempts."
+            explanation = "Multiple login attempts may indicate forced access."
         elif feature == "transaction_duration":
-            explanation = "Very short transaction times may suggest automated fraud or scripted behavior."
+            explanation = "Very short durations could suggest automation or bots."
         elif feature == "is_late_night":
-            explanation = "Late-night activity has a higher correlation with fraudulent behavior in historical data."
+            explanation = "Late-night actions tend to correlate with higher fraud."
         elif feature == "is_negative_balance_after":
-            explanation = "Ending in a negative balance often implies misuse or overdraft attempts."
+            explanation = "Ending with a negative balance may suggest risky behavior."
         else:
-            explanation = "This value was scored based on deviation from normal behavior learned by the model."
+            explanation = "Scored based on deviation from usual behavior."
         st.markdown(f"- **{feature.replace('_', ' ').capitalize()}**: `{value:.2f}` → {explanation}")
 
-    if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
+    st.markdown("### 📊 Adjusted Anomaly Heatmap (Fraud Risk Based):")
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.heatmap(d['input_df'].T, annot=True, cmap="Reds", fmt=".2f", ax=ax, cbar_kws={'label': 'Feature Value'})
+    st.pyplot(fig)
+
+    if d['result'] == "Fraudulent" and d['confidence_score'] >= 75 and d['email'] and not st.session_state.email_sent:
         if st.button("📧 Send Fraud Alert Email"):
             tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
             email_sent = send_email_alert(
                 to_email=d['email'],
                 subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
-                message=f"""A transaction was flagged with a **confidence level of {d['confidence_score']}%**.
+                message=f"""A transaction was flagged with a confidence level of {d['confidence_score']}%.
 
 Behavioral Risk Rating: {d['behavior_rating']} / 5
 
