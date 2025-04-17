@@ -188,6 +188,7 @@ if submitted:
     raw_score = isolation_model.decision_function(input_df)[0]
     confidence_score = round((1 - raw_score) * 50, 2)
     confidence_score = max(0.0, min(confidence_score, 100.0))
+
     behavior_cluster = int(kmeans.predict(input_df)[0])
     result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
 
@@ -201,12 +202,21 @@ if submitted:
         "input_df": input_df
     }
 
-# Output Display
+# Display Output
 if st.session_state.submitted:
     d = st.session_state.result_data
     st.markdown(f"### Prediction: **{d['result']}**")
     st.markdown(f"**Confidence Score:** {d['confidence_score']}%")
-    st.markdown(f"**Behavioral Cluster:** {d['behavior_cluster']}")
+
+    cluster_map = {
+        0: "Low-risk cluster with consistent behavior and established transaction patterns.",
+        1: "Mildly irregular cluster — moderate risk with some timing/amount deviations.",
+        2: "High-alert cluster with frequent large or off-hour transactions.",
+        3: "Erratic behavior cluster. Sparse history or unusual patterns — often seen in new or suspicious accounts."
+    }
+
+    cluster_explanation = cluster_map.get(d['behavior_cluster'], 'Unknown cluster')
+    st.markdown(f"**Behavioral Cluster:** {d['behavior_cluster']} – {cluster_explanation}")
 
     if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
         if st.button("📧 Send Fraud Alert Email"):
@@ -216,7 +226,7 @@ if st.session_state.submitted:
                 subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
                 message=f"""A transaction was flagged with a fraud confidence of {d['confidence_score']}%.
 
-Behavioral Cluster: {d['behavior_cluster']}
+Behavioral Cluster: {d['behavior_cluster']} – {cluster_explanation}
 
 Transaction Details:
 {tx}
