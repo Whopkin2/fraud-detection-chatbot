@@ -202,46 +202,6 @@ if submitted:
 if st.session_state.submitted:
     d = st.session_state.result_data
 
-    rating = 0.0
-    explanation_bullets = []
-
-    def score_item(condition, pos_weight, neg_weight, label):
-        nonlocal rating
-        if condition:
-            rating += pos_weight
-            explanation_bullets.append(f"+{pos_weight} if {label}")
-        else:
-            rating += neg_weight
-            explanation_bullets.append(f"{neg_weight} if NOT {label}")
-
-    score_item(d["user_input"]["account_age_days"] < 90, 1.0, -1.0, "account is less than 90 days old")
-    score_item(d["user_input"]["login_attempts"] > 3, 0.5, -0.5, "there are more than 3 login attempts")
-    score_item(d["user_input"]["transaction_amount"] > 5000, 1.0, -1.0, "the transaction amount exceeds $5,000")
-    score_item(d["user_input"]["is_late_night"], 0.5, -0.5, "the transaction occurred at night or evening")
-    score_item(d["user_input"]["transaction_method"] in ["Online", "Mobile"], 0.5, -0.5, "the transaction method is Online or Mobile")
-    score_item(d["user_input"]["is_international"], 0.5, -0.5, "the transaction is international")
-    score_item(d["user_input"]["is_negative_balance_after"], 0.5, -0.5, "the account is in negative balance after transaction")
-    score_item(d["user_input"]["transaction_duration"] < 2, 0.5, -0.5, "the transaction was shorter than 2 minutes")
-    score_item(d["user_input"]["customer_age"] < 20, 0.5, -0.5, "the customer is under 20 years old")
-
-    rating = round(min(max(rating, 0.0), 5.0), 1)
-
-    st.markdown("### \U0001f9e0 Behavioral Risk Rating Explanation and Score:")
-    st.markdown("""
-This score is computed based on the following weighted risk factors:
-
-- **+1.0 / –1.0** → Account age (<90 days = +1.0, otherwise –1.0)
-- **+0.5 / –0.5** → Login attempts (>3 = +0.5, otherwise –0.5)
-- **+1.0 / –1.0** → Transaction amount exceeds $5,000 = +1.0, otherwise –1.0
-- **+0.5 / –0.5** → Night/evening transaction = +0.5, otherwise –0.5
-- **+0.5 / –0.5** → Method is Online or Mobile = +0.5, otherwise –0.5
-- **+0.5 / –0.5** → Transaction is international = +0.5, otherwise –0.5
-- **+0.5 / –0.5** → Negative balance after transaction = +0.5, otherwise –0.5
-- **+0.5 / –0.5** → Short duration (<2 min = +0.5, else –0.5)
-- **+0.5 / –0.5** → Young age (<20 = +0.5, else –0.5)
-""")
-    st.markdown(f"\U0001f9e0 **Behavioral Risk Rating: {rating} / 5**")
-
     st.markdown("### \U0001f4ca Adjusted Anomaly Heatmap (Fraud Risk Based):")
     fig, ax = plt.subplots(figsize=(10, 6))
     heat_data = d['input_df'].T.copy()
@@ -250,7 +210,15 @@ This score is computed based on the following weighted risk factors:
     fraud_scores = ((heat_data - mean_vals) / std_vals).abs()
     fraud_scores = fraud_scores.clip(0, 3)
     cmap = sns.diverging_palette(240, 10, as_cmap=True)
-    sns.heatmap(fraud_scores.to_frame(name='Fraud Likelihood Score'), annot=True, cmap=cmap, fmt=".2f", ax=ax, center=1.5, cbar_kws={'label': 'Fraud Likelihood Score'})
+    sns.heatmap(
+        fraud_scores.to_frame(name='Fraud Likelihood Score'),
+        annot=True,
+        cmap=cmap,
+        fmt=".2f",
+        ax=ax,
+        center=1.5,
+        cbar_kws={'label': 'Fraud Likelihood Score'}
+    )
     ax.set_ylabel("Features")
     st.pyplot(fig)
 
@@ -278,8 +246,6 @@ This score is computed based on the following weighted risk factors:
                 to_email=d['email'],
                 subject="\U0001f6a8 FRAUD ALERT – Suspicious Transaction Detected",
                 message=f"""A transaction was flagged with a **confidence level of {d['confidence_score']}%**.
-
-Behavioral Risk Rating: {rating} / 5
 
 Transaction Details:
 {tx}
