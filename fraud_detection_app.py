@@ -98,11 +98,11 @@ def compute_behavioral_risk_score(user_input):
     score += 0.5 if user_input["login_attempts"] > 3 else -0.5
     score += 1.0 if user_input["transaction_amount"] > 5000 else -1.0
     score += 0.5 if user_input["is_late_night"] == 1 else -0.5
-    score += 0.5 if user_input["transaction_method"] in ["Online", "Mobile"] else -0.5
+    score += 0.5 if user_input["transaction_method"] in ["Online", "Mobile", "Wire"] else -0.5
     score += 0.5 if user_input["is_international"] == "Yes" else -0.5
     score += 0.5 if user_input["is_negative_balance_after"] == 1 else -0.5
     score += 0.5 if user_input["transaction_duration"] < 2 else -0.5
-    score += 0.5 if user_input["customer_age"] < 20 else -0.5
+    score += 0.5 if user_input["customer_age"] < 24 else -0.5
     return max(0.0, min(5.0, round(score, 2)))
 
 def send_email_alert(to_email, subject, message):
@@ -197,13 +197,12 @@ if submitted:
 
     input_df = input_df.astype(float).reindex(columns=X.columns, fill_value=0)
 
+    rating = compute_behavioral_risk_score(user_input)
+    confidence_score = calculate_confidence_from_rating(rating)
+
     prediction = isolation_model.predict(input_df)[0]
-    raw_score = isolation_model.decision_function(input_df)[0]
-    confidence_score = round(((-raw_score + 0.5) / 1.0) * 100, 2)
-    confidence_score = max(0.0, min(confidence_score, 100.0))
     result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
 
-    rating = compute_behavioral_risk_score(user_input)
 
     explanation_lines = [
         f"- Transaction Amount: ${user_input['transaction_amount']} – higher amounts are often suspicious.",
@@ -259,15 +258,15 @@ if st.session_state.submitted:
     score_factors.append(("Time of Day", +0.5 if user["is_late_night"] == 1 else -0.5,
                           "Suspicious late-night timing" if user["is_late_night"] == 1 else "Normal hours"))
     score_factors.append(("Method", +0.5 if user["transaction_method"] in ["Online", "Mobile"] else -0.5,
-                          "Remote transaction method" if user["transaction_method"] in ["Online", "Mobile"] else "In-person method"))
+                          "Remote transaction method" if user["transaction_method"] in ["Online", "Mobile", "Wire"] else "In-person method"))
     score_factors.append(("International", +0.5 if user["is_international"] == "Yes" else -0.5,
                           "International transaction" if user["is_international"] == "Yes" else "Domestic transaction"))
     score_factors.append(("Negative Balance", +0.5 if user["is_negative_balance_after"] == 1 else -0.5,
                           "Ends in negative balance" if user["is_negative_balance_after"] == 1 else "Balance is sufficient"))
     score_factors.append(("Short Duration", +0.5 if user["transaction_duration"] < 2 else -0.5,
                           "Suspiciously fast transaction" if user["transaction_duration"] < 2 else "Normal duration"))
-    score_factors.append(("Young Age", +0.5 if user["customer_age"] < 20 else -0.5,
-                          "Very young customer" if user["customer_age"] < 20 else "Customer age is mature"))
+    score_factors.append(("Young Age", +0.5 if user["customer_age"] < 24 else -0.5,
+                          "Very young customer" if user["customer_age"] < 24 else "Customer age is mature"))
 
     st.markdown(f"**Total Behavioral Risk Rating: {score} / 5**")
 
