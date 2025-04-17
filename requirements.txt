@@ -2,7 +2,9 @@ streamlit
 pandas
 openai
 scikit-learn
+python-dotenv
+numpy
 matplotlib
 seaborn
-python-dotenv
+xlsxwriter
 openpyxl
