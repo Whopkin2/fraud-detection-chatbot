@@ -251,7 +251,7 @@ This score is computed based on the following weighted risk factors:
 The score is capped at 5.0. A higher score means riskier behavioral patterns.
         """)
 
-     "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
+    if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
         if st.button("📧 Send Fraud Alert Email"):
             tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
             email_sent = send_email_alert(
