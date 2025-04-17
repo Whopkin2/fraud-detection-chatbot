@@ -235,19 +235,23 @@ if st.session_state.submitted:
     st.markdown(f"### Prediction: **{d['result']}**")
     st.markdown(f"**Confidence Level:** {d['confidence_score']}% Confident")
 
-    st.markdown("### \U0001f9e0 Behavioral Risk Rating Explanation and Score:")
-    st.markdown(f"""
-This score is computed based on the following weighted risk factors:
+    st.markdown("### 🧠 Behavioral Risk Rating (+/– System)")
+st.markdown(f"**Behavioral Risk Rating: {d['behavior_rating']} / 5**")
 
-- **+1.0** if account is less than 90 days old  
-- **+0.5** if there are more than 3 login attempts  
-- **+1.0** if the transaction amount exceeds $5,000  
-- **+0.5** if the transaction occurred at night or evening  
-- **+0.5** if the transaction method is Online or Mobile  
-- **+0.5** if the model flagged this transaction as fraudulent  
+st.markdown(\"\"\"
+Each factor contributes + or – to the behavioral score based on risk conditions:
 
-**\U0001f9e0 Behavioral Risk Rating: {d['behavior_rating']} / 5**
-""")
+- **+1.0 / –1.0** → Account age (<90 days = +1.0, otherwise –1.0)  
+- **+0.5 / –0.5** → Login attempts (>3 = +0.5, otherwise –0.5)  
+- **+1.0 / –1.0** → Transaction > $5,000 = +1.0, otherwise –1.0  
+- **+0.5 / –0.5** → Night/evening = +0.5, otherwise –0.5  
+- **+0.5 / –0.5** → Method = Online/Mobile = +0.5, otherwise –0.5  
+- **+0.5 / –0.5** → is_international = +0.5, otherwise –0.5  
+- **+0.5 / –0.5** → Negative balance = +0.5, otherwise –0.5  
+- **+0.5 / –0.5** → Short duration (<2 min = +0.5, else –0.5)  
+- **+0.5 / –0.5** → Young age (<20 = +0.5, else –0.5)  
+\"\"\")
+
 
     st.markdown("### Explanation:")
     st.markdown(d['explanation'])
