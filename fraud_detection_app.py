@@ -188,7 +188,6 @@ if submitted:
     confidence_score = max(0.0, min(confidence_score, 100.0))
     result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
 
-    # Behavioral risk rating system
     rating = 1.0
     if user_input["account_age_days"] < 90: rating += 1.0
     if user_input["login_attempts"] > 3: rating += 0.5
@@ -235,12 +234,15 @@ if st.session_state.submitted:
     d = st.session_state.result_data
     st.markdown(f"### Prediction: **{d['result']}**")
     st.markdown(f"**Confidence Level:** {d['confidence_score']}% Confident")
-    st.markdown(f"**🧠 Behavioral Risk Rating:** {d['behavior_rating']} / 5")
+
+    if "behavior_rating" in d:
+        st.markdown(f"**🧠 Behavioral Risk Rating:** {d['behavior_rating']} / 5")
+
     st.markdown("### Explanation:")
     st.markdown(d['explanation'])
 
     st.markdown("### 🔍 Feature Highlights Contributing to Detection:")
-    for insight in d['anomaly_insights']:
+    for insight in d.get('anomaly_insights', []):
         st.markdown(insight)
 
     if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
