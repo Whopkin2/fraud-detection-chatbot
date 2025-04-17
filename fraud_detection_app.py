@@ -5,7 +5,6 @@ import os
 from dotenv import load_dotenv
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import LabelEncoder
-from sklearn.cluster import KMeans
 import numpy as np
 import smtplib
 from email.mime.text import MIMEText
@@ -46,13 +45,6 @@ X = data[features]
 
 isolation_model = IsolationForest(contamination=0.05, n_estimators=200, max_features=0.9, random_state=42)
 isolation_model.fit(X)
-
-X_scored = X.copy()
-X_scored["anomaly_score"] = isolation_model.decision_function(X)
-X_scored["is_fraud"] = isolation_model.predict(X)
-
-kmeans = KMeans(n_clusters=4, random_state=42)
-X_scored["behavior_cluster"] = kmeans.fit_predict(X)
 
 def sanitize_numeric(value):
     if isinstance(value, str):
@@ -124,7 +116,6 @@ def send_email_alert(to_email, subject, message):
         st.error(f"❌ Email alert failed: {e}")
         return False
 
-# Session Setup
 if "submitted" not in st.session_state:
     st.session_state.submitted = False
 if "result_data" not in st.session_state:
@@ -195,17 +186,28 @@ if submitted:
     raw_score = isolation_model.decision_function(input_df)[0]
     confidence_score = round(((-raw_score + 0.5) / 1.0) * 100, 2)
     confidence_score = max(0.0, min(confidence_score, 100.0))
-    behavior_cluster = int(kmeans.predict(input_df)[0])
     result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
 
-    prompt = f"""
-Given the transaction data: {user_input},
-and a model that flagged it as {result} with a confidence score of {confidence_score}%,
-evaluate the transaction in detail. Include account age, login attempts, transaction method and duration,
-and explain how these factors influence the model's decision.
+    # Behavioral risk rating system
+    rating = 1.0
+    if user_input["account_age_days"] < 90: rating += 1.0
+    if user_input["login_attempts"] > 3: rating += 0.5
+    if user_input["transaction_amount"] > 5000: rating += 1.0
+    if user_input["is_late_night"]: rating += 0.5
+    if user_input["transaction_method"] in ["Online", "Mobile"]: rating += 0.5
+    if prediction == -1: rating += 0.5
+    rating = min(5.0, round(rating, 1))
 
-Important: Do NOT use the term "fraud score" at all in your response. Only use "confidence score". 
-If referring to model certainty, explain it as the confidence level of detecting potential fraud.
+    explanation_lines = [
+        f"- Transaction Amount: ${user_input['transaction_amount']} – higher amounts are often suspicious.",
+        f"- Account Age: {user_input['account_age_days']} days – newer accounts tend to have higher risk.",
+        f"- Login Attempts: {user_input['login_attempts']} – excessive login attempts raise red flags.",
+        f"- Time of Day: {user_input['time_of_day']} – late hours can indicate attempts to avoid detection.",
+        f"- Transaction Method: {user_input['transaction_method']} – remote methods can mask identity."
+    ]
+
+    prompt = f"""
+Given the transaction data: {user_input},\nPredicted: {result} with a confidence score of {confidence_score}%,\nBehavioral Risk Rating: {rating}/5\nExplain these findings to the user in layman's terms.
 """
 
     response = client.chat.completions.create(
@@ -222,35 +224,24 @@ If referring to model certainty, explain it as the confidence level of detecting
         "user_input": user_input,
         "result": result,
         "confidence_score": confidence_score,
-        "behavior_cluster": behavior_cluster,
+        "behavior_rating": rating,
         "email": account_owner_email,
         "input_df": input_df,
-        "explanation": explanation
+        "explanation": explanation,
+        "anomaly_insights": explanation_lines
     }
 
 if st.session_state.submitted:
     d = st.session_state.result_data
     st.markdown(f"### Prediction: **{d['result']}**")
     st.markdown(f"**Confidence Level:** {d['confidence_score']}% Confident")
-
-    cluster_map = {
-        0: "Low-risk cluster with consistent behavior and established transaction patterns.",
-        1: "Mildly irregular cluster — moderate risk with some timing/amount deviations.",
-        2: "High-alert cluster with frequent large or off-hour transactions.",
-        3: "Erratic behavior cluster. Sparse history or unusual patterns — often seen in new or suspicious accounts."
-    }
-
-    cluster_explanation = cluster_map.get(d['behavior_cluster'], 'Unknown cluster')
-    st.markdown(f"**Behavioral Cluster:** {d['behavior_cluster']} – {cluster_explanation}")
-
+    st.markdown(f"**🧠 Behavioral Risk Rating:** {d['behavior_rating']} / 5")
     st.markdown("### Explanation:")
     st.markdown(d['explanation'])
 
-    if 'input_df' in d and not d['input_df'].empty:
-        st.markdown("### 🔍 Key Feature Values for This Transaction:")
-        top_input_features = d['input_df'].iloc[0].sort_values(ascending=False).head(5)
-        for feat, val in top_input_features.items():
-            st.markdown(f"- **{feat.replace('_', ' ').capitalize()}**: `{val:.2f}`")
+    st.markdown("### 🔍 Feature Highlights Contributing to Detection:")
+    for insight in d['anomaly_insights']:
+        st.markdown(insight)
 
     if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
         if st.button("📧 Send Fraud Alert Email"):
@@ -260,7 +251,7 @@ if st.session_state.submitted:
                 subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
                 message=f"""A transaction was flagged with a **confidence level of {d['confidence_score']}%**.
 
-Behavioral Cluster: {d['behavior_cluster']} – {cluster_explanation}
+Behavioral Risk Rating: {d['behavior_rating']} / 5
 
 Transaction Details:
 {tx}
