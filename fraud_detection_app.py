@@ -10,6 +10,8 @@ import numpy as np
 import smtplib
 from email.mime.text import MIMEText
 import re
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 st.set_page_config(page_title="Fraud Detector", layout="centered")
 load_dotenv()
@@ -204,7 +206,7 @@ and a model that flagged it as {result} with a confidence score of {confidence_s
 evaluate the transaction in detail. Include account age, login attempts, transaction method and duration,
 and explain how these factors influence the model's decision.
 
-Important: Do NOT use the term "fraud score" at all in your response. Only use "confidence score". 
+Important: Do NOT use the term \"fraud score\" at all in your response. Only use \"confidence score\". 
 If referring to model certainty, explain it as the confidence level of detecting potential fraud.
 """
 
@@ -232,16 +234,32 @@ if st.session_state.submitted:
     d = st.session_state.result_data
     st.markdown(f"### Prediction: **{d['result']}**")
     st.markdown(f"**Confidence Level:** {d['confidence_score']}% Confident")
+    st.markdown(f"**Behavioral Cluster:** {d['behavior_cluster']}")
 
-    cluster_map = {
-        0: "Low-risk cluster with consistent behavior and established transaction patterns.",
-        1: "Mildly irregular cluster — moderate risk with some timing/amount deviations.",
-        2: "High-alert cluster with frequent large or off-hour transactions.",
-        3: "Erratic behavior cluster. Sparse history or unusual patterns — often seen in new or suspicious accounts."
-    }
+    # GPT-powered behavioral description
+    behavior_prompt = f"""
+A transaction was categorized into behavioral cluster {d['behavior_cluster']}. Based on this cluster, generate a detailed and professional explanation suitable for a security team reviewing suspicious banking transactions.
 
-    cluster_explanation = cluster_map.get(d['behavior_cluster'], 'Unknown cluster')
-    st.markdown(f"**Behavioral Cluster:** {d['behavior_cluster']} – {cluster_explanation}")
+Use plain English, and go in-depth about what patterns or behaviors are often seen in this cluster. Address factors like:
+- Login timing and frequency
+- Account age and stability
+- Transaction methods (ATM, Online, Mobile, etc.)
+- Frequency and size of transaction amounts
+- Known risk behaviors (e.g., frequent late-night use, international transfers)
+
+End your explanation with a clearly stated **Behavioral Risk Rating from 1 to 5**, where 5 indicates extremely risky behavior.
+
+Do not use technical terms like \"k-means\" or \"machine learning model.\" Instead, sound like a human fraud analyst writing a field report.
+"""
+    cluster_response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": "You are a senior fraud analyst who writes behavioral assessments of suspicious financial activity."},
+            {"role": "user", "content": behavior_prompt}
+        ]
+    )
+    full_cluster_description = cluster_response.choices[0].message.content.strip()
+    st.markdown(f"### 🧠 Behavioral Profile\n{full_cluster_description}")
 
     st.markdown("### Explanation:")
     st.markdown(d['explanation'])
@@ -252,6 +270,28 @@ if st.session_state.submitted:
         for feat, val in top_input_features.items():
             st.markdown(f"- **{feat.replace('_', ' ').capitalize()}**: `{val:.2f}`")
 
+        # Anomaly Heatmap
+        with st.expander("📈 View Anomaly Heatmap with Explanation"):
+            st.markdown("This heatmap shows how features relate to one another across all transactions. Strong positive or negative values indicate relationships the AI considers when identifying anomalies.")
+            corr_matrix = X.corr()
+            fig, ax = plt.subplots(figsize=(10, 7))
+            sns.heatmap(corr_matrix, annot=True, cmap="coolwarm", fmt=".2f", ax=ax)
+            st.pyplot(fig)
+
+            st.markdown("""
+**🧠 How to read the heatmap:**
+
+- Values close to `1.00` mean two features increase together (e.g., transaction amount and balance before).
+- Values close to `-1.00` mean when one increases, the other decreases (e.g., login attempts vs. balance after).
+- Values near `0` mean weak or no correlation.
+
+**Why this matters for fraud detection:**
+
+- Strong correlations reveal behavioral patterns that are expected (e.g., consistent login habits).
+- Weak or unexpected correlations might suggest a deviation from the norm — a key sign of potential fraud.
+- AI models use this relational data to detect anomalies even when individual features look normal.
+""")
+
     if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
         if st.button("📧 Send Fraud Alert Email"):
             tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
@@ -260,7 +300,7 @@ if st.session_state.submitted:
                 subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
                 message=f"""A transaction was flagged with a **confidence level of {d['confidence_score']}%**.
 
-Behavioral Cluster: {d['behavior_cluster']} – {cluster_explanation}
+Behavioral Cluster: {d['behavior_cluster']}
 
 Transaction Details:
 {tx}
