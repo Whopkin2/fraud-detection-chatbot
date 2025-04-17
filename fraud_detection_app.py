@@ -188,14 +188,7 @@ if submitted:
     confidence_score = max(0.0, min(confidence_score, 100.0))
     result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
 
-    rating = 1.0
-    if user_input["account_age_days"] < 90: rating += 1.0
-    if user_input["login_attempts"] > 3: rating += 0.5
-    if user_input["transaction_amount"] > 5000: rating += 1.0
-    if user_input["is_late_night"]: rating += 0.5
-    if user_input["transaction_method"] in ["Online", "Mobile"]: rating += 0.5
-    if prediction == -1: rating += 0.5
-    rating = min(5.0, round(rating, 1))
+rating = compute_behavioral_risk_score(user_input)
 
     explanation_lines = [
         f"- Transaction Amount: ${user_input['transaction_amount']} – higher amounts are often suspicious.",
