@@ -246,9 +246,11 @@ if st.session_state.submitted:
     st.markdown("### \U0001f4ca Anomaly Heatmap (Model Scoring):")
     fig, ax = plt.subplots(figsize=(10, 6))
     heat_data = d['input_df'].T.copy()
-    fraud_scores = heat_data.apply(lambda x: abs(x - X.mean()) / (X.std() + 1e-5), axis=1)
+    mean_vals = X.mean()
+    std_vals = X.std() + 1e-6
+    fraud_scores = ((heat_data - mean_vals) / std_vals).abs()
     fraud_scores = fraud_scores.clip(0, 3)
-    sns.heatmap(fraud_scores.to_frame(name='Fraud Risk'), annot=True, cmap="coolwarm_r", fmt=".2f", ax=ax, cbar_kws={'label': 'Fraud Likelihood'})
+    sns.heatmap(fraud_scores.to_frame(name='Fraud Risk'), annot=True, cmap="coolwarm_r", fmt=".2f", ax=ax, cbar_kws={'label': 'Fraud Likelihood'}){'label': 'Fraud Likelihood'})
     st.pyplot(fig)
 
     st.markdown("**\U0001f50d Heatmap Explanation:**")
