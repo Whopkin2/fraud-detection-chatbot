@@ -123,7 +123,7 @@ if "result_data" not in st.session_state:
 if "email_sent" not in st.session_state:
     st.session_state.email_sent = False
 
-st.markdown("## \U0001f575️ <span style='font-family: Arial;'>Fraud Detection Chatbot</span>", unsafe_allow_html=True)
+st.markdown("## \U0001f575️ <span style='font-family: Arial;'>Fraud Detection AI Tool</span>", unsafe_allow_html=True)
 
 with st.form("user_input_form"):
     st.markdown("### <span style='font-family: Arial;'>Enter transaction data:</span>", unsafe_allow_html=True)
