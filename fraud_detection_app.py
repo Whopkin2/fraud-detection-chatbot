@@ -1,3 +1,4 @@
+# ✅ EVERYTHING INCLUDED — STARTS HERE
 import streamlit as st
 import pandas as pd
 import openai
@@ -26,7 +27,6 @@ def load_data():
 data = load_data()
 data = data.drop(columns=["transaction_id", "branch_code", "device_id"])
 
-# Feature Engineering
 data["is_negative_balance_after"] = (data["balance_after_transaction"] < 0).astype(int)
 data["is_late_night"] = data["time_of_day"].apply(lambda x: 1 if str(x).lower() in ["night", "evening"] else 0)
 
@@ -77,7 +77,7 @@ def parse_account_age(text):
         return num * 30
     elif "year" in text:
         return num * 365
-    return num  # already in days
+    return num
 
 def parse_transaction_duration(text):
     text = str(text).lower()
@@ -86,7 +86,7 @@ def parse_transaction_duration(text):
         return num / 60
     elif "hour" in text:
         return num * 60
-    return num  # already in minutes
+    return num
 
 def parse_customer_age(text):
     return extract_number(text)
@@ -191,13 +191,13 @@ if submitted:
 
     prediction = isolation_model.predict(input_df)[0]
     raw_score = isolation_model.decision_function(input_df)[0]
-    fraud_score = round((-raw_score) * 100, 2)  # Corrected logic
+    confidence_score = round((raw_score + 0.5) * 100, 2)
     behavior_cluster = int(kmeans.predict(input_df)[0])
     result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
 
     prompt = f"""
 Given the transaction data: {user_input},
-and a model that flagged it as {result} with fraud score {fraud_score},
+and a model that flagged it as {result} with prediction confidence {confidence_score}%,
 evaluate the transaction in detail. Include account age, login attempts, transaction type and duration,
 and explain how these factors influence the model's decision.
 """
@@ -215,7 +215,7 @@ and explain how these factors influence the model's decision.
     st.session_state.result_data = {
         "user_input": user_input,
         "result": result,
-        "fraud_score": fraud_score,
+        "confidence_score": confidence_score,
         "behavior_cluster": behavior_cluster,
         "explanation": explanation,
         "email": account_owner_email,
@@ -225,7 +225,7 @@ and explain how these factors influence the model's decision.
 if st.session_state.submitted:
     d = st.session_state.result_data
     st.markdown(f"### <span style='font-family: Arial;'>Prediction: <strong>{d['result']}</strong></span>", unsafe_allow_html=True)
-    st.markdown(f"**Fraud Score:** {d['fraud_score']}%")
+    st.markdown(f"**Prediction Confidence:** {d['confidence_score']}%")
 
     cluster_map = {
         0: "Low-risk cluster with consistent behavior and established transaction patterns.",
@@ -234,13 +234,7 @@ if st.session_state.submitted:
         3: "Erratic behavior cluster. Sparse history or unusual patterns — often seen in new or suspicious accounts."
     }
 
-    if d['result'] == "Fraudulent" and d['fraud_score'] > 60:
-        cluster_explanation = (
-            f"{cluster_map.get(d['behavior_cluster'], 'Unknown cluster')} "
-            f"However, this transaction was flagged as fraudulent, indicating a risk spike not typical for this profile."
-        )
-    else:
-        cluster_explanation = cluster_map.get(d['behavior_cluster'], 'Unknown cluster')
+    cluster_explanation = cluster_map.get(d['behavior_cluster'], 'Unknown cluster')
 
     st.markdown(f"**Behavioral Cluster:** {d['behavior_cluster']} – {cluster_explanation}")
     st.markdown("### Explanation:")
@@ -252,12 +246,13 @@ if st.session_state.submitted:
         for feat, val in top_input_features.items():
             st.markdown(f"- **{feat.replace('_', ' ').capitalize()}**: `{val:.2f}`")
 
-    if d['result'] == "Fraudulent" and d['fraud_score'] > 75 and d['email'] and not st.session_state.email_sent:
+    # ✅ FINAL EMAIL LOGIC — FRAUDULENT + HIGH CONFIDENCE
+    if d['result'] == "Fraudulent" and d['confidence_score'] > 75 and d['email'] and not st.session_state.email_sent:
         tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
         email_sent = send_email_alert(
             to_email=d['email'],
             subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
-            message=f"""A transaction was flagged with a fraud score of {d['fraud_score']}%.
+            message=f"""A transaction was flagged as FRAUDULENT with high confidence ({d['confidence_score']}%).
 
 Behavioral Cluster: {d['behavior_cluster']} – {cluster_explanation}
 
