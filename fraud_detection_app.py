@@ -184,7 +184,7 @@ if submitted:
 
     prediction = isolation_model.predict(input_df)[0]
     raw_score = isolation_model.decision_function(input_df)[0]
-    confidence_score = round(((-raw_score + 0.5) * 2.5) * 100, 2)  # amplify confidence for clearer fraud
+    confidence_score = round(((-raw_score + 0.5) / 1.0) * 100, 2)
     confidence_score = max(0.0, min(confidence_score, 100.0))
     result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
 
@@ -237,8 +237,45 @@ if st.session_state.submitted:
 
     if "behavior_rating" in d:
         st.markdown(f"**🧠 Behavioral Risk Rating:** {d['behavior_rating']} / 5")
-        st.markdown("### 🧠 Behavioral Risk Rating Explanation:")
-        st.markdown("""
+
+    st.markdown("### Explanation:")
+    st.markdown(d['explanation'])
+
+    st.markdown("### 🔍 Feature Highlights Contributing to Detection:")
+    for insight in d.get('anomaly_insights', []):
+        st.markdown(insight)
+
+    # Anomaly Heatmap Explanation
+    st.markdown("### 📊 Anomaly Heatmap (Model Scoring):")
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    heat_data = d['input_df'].T
+    sns.heatmap(heat_data, annot=True, cmap="Reds", fmt=".2f", ax=ax, cbar_kws={'label': 'Feature Value'})
+    st.pyplot(fig)
+
+    st.markdown("**🔍 Heatmap Explanation:**")
+    for feature, value in d['input_df'].iloc[0].items():
+        explanation = ""
+        if feature == "transaction_amount":
+            explanation = "Higher values here often flag potential fraud due to large transfers or withdrawals."
+        elif feature == "account_age_days":
+            explanation = "Lower account age (fewer days active) is riskier and flagged more often."
+        elif feature == "login_attempts":
+            explanation = "An unusually high number of login attempts may imply unauthorized access attempts."
+        elif feature == "transaction_duration":
+            explanation = "Very short transaction times may suggest automated fraud or scripted behavior."
+        elif feature == "is_late_night":
+            explanation = "Late-night activity has a higher correlation with fraudulent behavior in historical data."
+        elif feature == "is_negative_balance_after":
+            explanation = "Ending in a negative balance often implies misuse or overdraft attempts."
+        else:
+            explanation = "This value was scored based on deviation from normal behavior learned by the model."
+        st.markdown(f"- **{feature.replace('_', ' ').capitalize()}**: `{value:.2f}` → {explanation}")
+
+    st.markdown("### 🧠 Behavioral Risk Rating Explanation:")
+    st.markdown("""
 This score is computed based on the following weighted risk factors:
 
 - **+1.0** if account is less than 90 days old
@@ -249,7 +286,7 @@ This score is computed based on the following weighted risk factors:
 - **+0.5** if the model flagged this transaction as fraudulent
 
 The score is capped at 5.0. A higher score means riskier behavioral patterns.
-        """)
+    """)
 
     if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
         if st.button("📧 Send Fraud Alert Email"):
