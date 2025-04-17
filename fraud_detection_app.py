@@ -186,11 +186,29 @@ if submitted:
 
     prediction = isolation_model.predict(input_df)[0]
     raw_score = isolation_model.decision_function(input_df)[0]
-    confidence_score = round((1 - raw_score) * 50, 2)
+    confidence_score = round(((-raw_score + 0.5) / 1.0) * 100, 2)
     confidence_score = max(0.0, min(confidence_score, 100.0))
 
     behavior_cluster = int(kmeans.predict(input_df)[0])
     result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
+
+    prompt = f"""
+Given the transaction data: {user_input},
+and a model that flagged it as {result} with a confidence score of {confidence_score}%,
+evaluate the transaction in detail. Include account age, login attempts, transaction method and duration,
+and explain how these factors influence the model's decision.
+
+Avoid using the term "fraud score" — refer to it only as confidence score.
+"""
+
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": "You are a helpful fraud risk advisor who explains AI-based anomaly detection decisions."},
+            {"role": "user", "content": prompt}
+        ]
+    )
+    explanation = response.choices[0].message.content
 
     st.session_state.submitted = True
     st.session_state.result_data = {
@@ -199,10 +217,11 @@ if submitted:
         "confidence_score": confidence_score,
         "behavior_cluster": behavior_cluster,
         "email": account_owner_email,
-        "input_df": input_df
+        "input_df": input_df,
+        "explanation": explanation
     }
 
-# Display Output
+# Output Display
 if st.session_state.submitted:
     d = st.session_state.result_data
     st.markdown(f"### Prediction: **{d['result']}**")
@@ -218,13 +237,22 @@ if st.session_state.submitted:
     cluster_explanation = cluster_map.get(d['behavior_cluster'], 'Unknown cluster')
     st.markdown(f"**Behavioral Cluster:** {d['behavior_cluster']} – {cluster_explanation}")
 
+    st.markdown("### Explanation:")
+    st.markdown(d['explanation'])
+
+    if 'input_df' in d and not d['input_df'].empty:
+        st.markdown("### 🔍 Key Feature Values for This Transaction:")
+        top_input_features = d['input_df'].iloc[0].sort_values(ascending=False).head(5)
+        for feat, val in top_input_features.items():
+            st.markdown(f"- **{feat.replace('_', ' ').capitalize()}**: `{val:.2f}`")
+
     if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
         if st.button("📧 Send Fraud Alert Email"):
             tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
             email_sent = send_email_alert(
                 to_email=d['email'],
                 subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
-                message=f"""A transaction was flagged with a fraud confidence of {d['confidence_score']}%.
+                message=f"""A transaction was flagged with a confidence score of {d['confidence_score']}%.
 
 Behavioral Cluster: {d['behavior_cluster']} – {cluster_explanation}
 
