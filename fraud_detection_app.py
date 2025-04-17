@@ -25,6 +25,7 @@ def load_data():
 data = load_data()
 data = data.drop(columns=["transaction_id", "branch_code", "device_id"])
 
+# Feature Engineering
 data["is_negative_balance_after"] = (data["balance_after_transaction"] < 0).astype(int)
 data["is_late_night"] = data["time_of_day"].apply(lambda x: 1 if str(x).lower() in ["night", "evening"] else 0)
 
@@ -43,17 +44,26 @@ features = [
 ]
 X = data[features]
 
-model = IsolationForest(contamination=0.05, n_estimators=200, max_features=0.9, random_state=42)
-model.fit(X)
+isolation_model = IsolationForest(contamination=0.05, n_estimators=200, max_features=0.9, random_state=42)
+isolation_model.fit(X)
 
 X_scored = X.copy()
-X_scored["anomaly_score"] = model.decision_function(X)
-X_scored["is_fraud"] = model.predict(X)
+X_scored["anomaly_score"] = isolation_model.decision_function(X)
+X_scored["is_fraud"] = isolation_model.predict(X)
 
 kmeans = KMeans(n_clusters=4, random_state=42)
 X_scored["behavior_cluster"] = kmeans.fit_predict(X)
 
-def parse_numeric(text):
+# Utility Functions
+def sanitize_numeric(value):
+    if isinstance(value, str):
+        value = value.replace("$", "").replace(",", "").strip()
+    try:
+        return float(value)
+    except:
+        return 0.0
+
+def extract_number(text):
     try:
         return float(re.search(r"\d*\.?\d+", str(text)).group())
     except:
@@ -61,134 +71,163 @@ def parse_numeric(text):
 
 def parse_account_age(text):
     text = str(text).lower()
-    num = parse_numeric(text)
-    return num * 30 if "month" in text else num * 365 if "year" in text else num
+    num = extract_number(text)
+    if "month" in text:
+        return num * 30
+    elif "year" in text:
+        return num * 365
+    return num
 
 def parse_transaction_duration(text):
     text = str(text).lower()
-    num = parse_numeric(text)
-    return num / 60 if "second" in text else num * 60 if "hour" in text else num
+    num = extract_number(text)
+    if "second" in text:
+        return num / 60
+    elif "hour" in text:
+        return num * 60
+    return num
+
+def parse_customer_age(text):
+    return extract_number(text)
 
 def parse_yes_no(value):
     return 1 if str(value).strip().lower() in ['yes', 'y', 'true', '1'] else 0
+
+def standardize_categoricals(user_input):
+    if "is_international" in user_input:
+        val = user_input["is_international"].strip().lower()
+        user_input["is_international"] = "Yes" if val in ["yes", "y", "true", "1"] else "No"
+    return user_input
 
 def send_email_alert(to_email, subject, message):
     try:
         sender_email = os.getenv("ALERT_SENDER_EMAIL")
         sender_password = os.getenv("EMAIL_PASS")
         admin_email = os.getenv("ALERT_ADMIN_EMAIL")
+        smtp_server = "smtp.gmail.com"
+        smtp_port = 587
+
+        if not sender_email or not sender_password or not admin_email:
+            raise Exception("Missing environment variables for email.")
 
         msg = MIMEText(message)
         msg["Subject"] = subject
         msg["From"] = sender_email
         msg["To"] = to_email
 
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
             server.starttls()
             server.login(sender_email, sender_password)
             server.sendmail(sender_email, [to_email, admin_email], msg.as_string())
+
         return True
     except Exception as e:
-        st.error(f"Email failed: {e}")
+        st.error(f"❌ Email alert failed: {e}")
         return False
 
+# Session Setup
+if "submitted" not in st.session_state:
+    st.session_state.submitted = False
 if "result_data" not in st.session_state:
     st.session_state.result_data = {}
 if "email_sent" not in st.session_state:
     st.session_state.email_sent = False
 
-st.markdown("""
-    <h2 style='font-family: Arial;'>🕵️ Fraud Detection Chatbot</h2>
-""", unsafe_allow_html=True)
+st.markdown("## 🕵️ <span style='font-family: Arial;'>Fraud Detection Chatbot</span>", unsafe_allow_html=True)
 
+# Input Form
 with st.form("user_input_form"):
-    st.markdown("<h4 style='font-family: Arial;'>Enter transaction details:</h4>", unsafe_allow_html=True)
+    st.markdown("### <span style='font-family: Arial;'>Enter transaction data:</span>", unsafe_allow_html=True)
     user_input = {}
     for col in features:
         label = col.replace('_', ' ').capitalize()
-        if col in ["is_negative_balance_after", "is_late_night", "is_international"]:
+        if col in categorical_cols:
+            label += " (categorical)"
+        elif col in ["is_negative_balance_after", "is_late_night"]:
             label += " (Yes or No)"
-        elif col == "account_age_days":
-            label = "Account age (e.g., '12 months' or '2 years')"
-        elif col == "transaction_duration":
-            label = "Transaction duration (e.g., '2 minutes')"
-        elif col == "customer_age":
-            label = "Customer age (e.g., '35 years')"
         else:
-            label += " (numeric)"
+            if col == "account_age_days":
+                label = "Account age (e.g., '12 months' or '2 years')"
+            elif col == "transaction_duration":
+                label = "Transaction duration (e.g., '3 minutes' or '2 hours')"
+            elif col == "customer_age":
+                label = "Customer age (e.g., '24 years')"
+            else:
+                label += " (numeric)"
         user_input[col] = st.text_input(label, key=col)
 
-    account_email = st.text_input("User email for fraud alert:")
+    account_owner_email = st.text_input("Account owner's email (for alert):")
     submitted = st.form_submit_button("Analyze Transaction")
 
+# On Submit
 if submitted:
-    user_input["account_age_days"] = parse_account_age(user_input.get("account_age_days", ""))
-    user_input["transaction_duration"] = parse_transaction_duration(user_input.get("transaction_duration", ""))
-    user_input["customer_age"] = parse_numeric(user_input.get("customer_age", ""))
-    user_input["is_late_night"] = parse_yes_no(user_input.get("is_late_night", ""))
-    user_input["is_negative_balance_after"] = parse_yes_no(user_input.get("is_negative_balance_after", ""))
-    user_input["is_international"] = "Yes" if parse_yes_no(user_input.get("is_international", "")) else "No"
+    user_input = standardize_categoricals(user_input)
+    user_input["account_age_days"] = parse_account_age(user_input.get("account_age_days", "1 year"))
+    user_input["transaction_duration"] = parse_transaction_duration(user_input.get("transaction_duration", "1 minute"))
+    user_input["customer_age"] = parse_customer_age(user_input.get("customer_age", "18"))
 
     for k in ["transaction_amount", "balance_before_transaction", "balance_after_transaction", "login_attempts"]:
-        user_input[k] = parse_numeric(user_input.get(k, 0))
+        user_input[k] = sanitize_numeric(user_input.get(k, "0"))
 
-    input_data = {col: user_input.get(col, 0) for col in features}
-    input_df = pd.DataFrame([input_data])
+    user_input["is_negative_balance_after"] = parse_yes_no(user_input.get("is_negative_balance_after", "No"))
+    user_input["is_late_night"] = parse_yes_no(user_input.get("is_late_night", "No"))
+
+    full_row = {col: user_input.get(col, 0 if col not in categorical_cols else "Unknown") for col in features}
+    input_df = pd.DataFrame([full_row])
+
     for col in categorical_cols:
         try:
             input_df[col] = label_encoders[col].transform(input_df[col].astype(str))
         except:
-            input_df[col] = 0
+            fallback = label_encoders[col].classes_[0]
+            input_df[col] = label_encoders[col].transform([fallback])[0]
 
-    input_df = input_df.astype(float)
-    prediction = model.predict(input_df)[0]
-    raw_score = model.decision_function(input_df)[0]
+    input_df = input_df.astype(float).reindex(columns=X.columns, fill_value=0)
 
-    # Reverse score logic: higher score = more fraud-like
-    fraud_score = round(((-raw_score + 0.5) * 100), 2)
-    result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
+    prediction = isolation_model.predict(input_df)[0]
+    raw_score = isolation_model.decision_function(input_df)[0]
+    confidence_score = round((1 - raw_score) * 50, 2)
+    confidence_score = max(0.0, min(confidence_score, 100.0))
     behavior_cluster = int(kmeans.predict(input_df)[0])
+    result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
 
+    st.session_state.submitted = True
     st.session_state.result_data = {
-        "fraud_score": fraud_score,
+        "user_input": user_input,
         "result": result,
-        "email": account_email,
-        "input_df": input_df,
-        "behavior_cluster": behavior_cluster
+        "confidence_score": confidence_score,
+        "behavior_cluster": behavior_cluster,
+        "email": account_owner_email,
+        "input_df": input_df
     }
 
-    st.markdown(f"<h4 style='font-family: Arial;'>Prediction: <strong>{result}</strong></h4>", unsafe_allow_html=True)
-    st.markdown(f"<p style='font-family: Arial;'><strong>Fraud Score:</strong> {fraud_score:.2f}%</p>", unsafe_allow_html=True)
+# Output Display
+if st.session_state.submitted:
+    d = st.session_state.result_data
+    st.markdown(f"### Prediction: **{d['result']}**")
+    st.markdown(f"**Confidence Score:** {d['confidence_score']}%")
+    st.markdown(f"**Behavioral Cluster:** {d['behavior_cluster']}")
 
-    cluster_map = {
-        0: "Low-risk cluster. Stable and expected behavior patterns.",
-        1: "Moderate-risk cluster. Slight anomalies detected.",
-        2: "High-risk cluster. Large or unusual transaction patterns.",
-        3: "Erratic behavior cluster. Sparse or suspicious activity history."
-    }
-    cluster_desc = cluster_map.get(behavior_cluster, "Unknown")
-    st.markdown(f"<p style='font-family: Arial;'><strong>Behavioral Cluster:</strong> {behavior_cluster} – {cluster_desc}</p>", unsafe_allow_html=True)
+    if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
+        if st.button("📧 Send Fraud Alert Email"):
+            tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
+            email_sent = send_email_alert(
+                to_email=d['email'],
+                subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
+                message=f"""A transaction was flagged with a fraud confidence of {d['confidence_score']}%.
 
-    if result == "Fraudulent" and fraud_score > 75 and not st.session_state.email_sent:
-        if st.button("Send Fraud Alert Email"):
-            tx_details = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in user_input.items()])
-            sent = send_email_alert(
-                to_email=account_email,
-                subject="🚨 FRAUD DETECTED - Immediate Action Required",
-                message=f"""
-Fraudulent transaction detected with {fraud_score:.2f}% confidence.
-
-Behavioral Cluster: {behavior_cluster} - {cluster_desc}
+Behavioral Cluster: {d['behavior_cluster']}
 
 Transaction Details:
-{tx_details}
+{tx}
 
 Recommended Actions:
-- Verify the transaction
-- Contact support if unauthorized
-- Monitor account activity immediately
-"""
+- Verify this transaction
+- Contact your bank if unauthorized
+- Monitor account activity immediately."""
             )
-            if sent:
-                st.success("✅ Email sent successfully.")
+            if email_sent:
+                st.success("✅ Alert sent to account owner and admin.")
                 st.session_state.email_sent = True
+            else:
+                st.error("❌ Email failed to send.")
