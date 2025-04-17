@@ -113,7 +113,7 @@ def send_email_alert(to_email, subject, message):
 
         return True
     except Exception as e:
-        st.error(f"❌ Email alert failed: {e}")
+        st.error(f"\u274c Email alert failed: {e}")
         return False
 
 if "submitted" not in st.session_state:
@@ -123,7 +123,7 @@ if "result_data" not in st.session_state:
 if "email_sent" not in st.session_state:
     st.session_state.email_sent = False
 
-st.markdown("## 🕵️ <span style='font-family: Arial;'>Fraud Detection Chatbot</span>", unsafe_allow_html=True)
+st.markdown("## \U0001f575️ <span style='font-family: Arial;'>Fraud Detection Chatbot</span>", unsafe_allow_html=True)
 
 with st.form("user_input_form"):
     st.markdown("### <span style='font-family: Arial;'>Enter transaction data:</span>", unsafe_allow_html=True)
@@ -235,18 +235,29 @@ if st.session_state.submitted:
     st.markdown(f"### Prediction: **{d['result']}**")
     st.markdown(f"**Confidence Level:** {d['confidence_score']}% Confident")
 
-    if "behavior_rating" in d:
-        st.markdown(f"**🧠 Behavioral Risk Rating:** {d['behavior_rating']} / 5")
+    st.markdown("### \U0001f9e0 Behavioral Risk Rating Explanation and Score:")
+    st.markdown(f"""
+This score is computed based on the following weighted risk factors:
+
+- **+1.0** if account is less than 90 days old  
+- **+0.5** if there are more than 3 login attempts  
+- **+1.0** if the transaction amount exceeds $5,000  
+- **+0.5** if the transaction occurred at night or evening  
+- **+0.5** if the transaction method is Online or Mobile  
+- **+0.5** if the model flagged this transaction as fraudulent  
+
+**\U0001f9e0 Behavioral Risk Rating: {d['behavior_rating']} / 5**
+""")
 
     st.markdown("### Explanation:")
     st.markdown(d['explanation'])
 
-    st.markdown("### 🔍 Feature Highlights Contributing to Detection:")
+    st.markdown("### \U0001f50d Feature Highlights Contributing to Detection:")
     for insight in d.get('anomaly_insights', []):
         st.markdown(insight)
 
     # Anomaly Heatmap Explanation
-    st.markdown("### 📊 Anomaly Heatmap (Model Scoring):")
+    st.markdown("### \U0001f4ca Anomaly Heatmap (Model Scoring):")
     import matplotlib.pyplot as plt
     import seaborn as sns
 
@@ -255,7 +266,7 @@ if st.session_state.submitted:
     sns.heatmap(heat_data, annot=True, cmap="Reds", fmt=".2f", ax=ax, cbar_kws={'label': 'Feature Value'})
     st.pyplot(fig)
 
-    st.markdown("**🔍 Heatmap Explanation:**")
+    st.markdown("**\U0001f50d Heatmap Explanation:**")
     for feature, value in d['input_df'].iloc[0].items():
         explanation = ""
         if feature == "transaction_amount":
@@ -273,20 +284,6 @@ if st.session_state.submitted:
         else:
             explanation = "This value was scored based on deviation from normal behavior learned by the model."
         st.markdown(f"- **{feature.replace('_', ' ').capitalize()}**: `{value:.2f}` → {explanation}")
-
-    st.markdown("### 🧠 Behavioral Risk Rating Explanation:")
-    st.markdown("""
-This score is computed based on the following weighted risk factors:
-
-- **+1.0** if account is less than 90 days old
-- **+0.5** if there are more than 3 login attempts
-- **+1.0** if the transaction amount exceeds $5,000
-- **+0.5** if the transaction occurred at night or evening
-- **+0.5** if the transaction method is Online or Mobile
-- **+0.5** if the model flagged this transaction as fraudulent
-
-The score is capped at 5.0. A higher score means riskier behavioral patterns.
-    """)
 
     if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
         if st.button("📧 Send Fraud Alert Email"):
