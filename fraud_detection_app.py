@@ -113,7 +113,7 @@ def compute_behavioral_risk_score(user):
     else:
         score -= 0.5
 
-    if user["transaction_amount"] > 5000:
+    if user["transaction_amount"] > 10000:
         score += 1.0
     else:
         score -= 1.0
@@ -303,7 +303,7 @@ if st.session_state.submitted:
 
     score_factors.append(("Account Age", +1.0 if user["account_age_days"] < 90 else -1.0, "Account is new" if user["account_age_days"] < 90 else "Account is established"))
     score_factors.append(("Login Attempts", +0.5 if user["login_attempts"] > 3 else -0.5, "Too many login attempts" if user["login_attempts"] > 3 else "Login count is normal"))
-    score_factors.append(("Transaction Amount", +1.0 if user["transaction_amount"] > 5000 else -1.0, "Large transaction amount" if user["transaction_amount"] > 5000 else "Amount is modest"))
+    score_factors.append(("Transaction Amount", +1.0 if user["transaction_amount"] > 10000 else -1.0, "Large transaction amount" if user["transaction_amount"] > 10000 else "Amount is modest"))
     score_factors.append(("Time of Day", +0.5 if user["is_late_night"] == 1 else -0.5, "Suspicious late-night timing" if user["is_late_night"] == 1 else "Normal hours"))
     score_factors.append(("Method", +0.5 if user["transaction_method"] in ["Online", "Mobile", "Wire"] else -0.5, "Remote transaction method" if user["transaction_method"] in ["Online", "Mobile", "Wire"] else "In-person method"))
     score_factors.append(("International", +0.5 if user["is_international"] == "Yes" else -0.5, "International transaction" if user["is_international"] == "Yes" else "Domestic transaction"))
@@ -335,30 +335,57 @@ if st.session_state.submitted:
     for insight in d.get('anomaly_insights', []):
         st.markdown(insight)
 
-    st.markdown("### 📊 Adjusted Anomaly Heatmap (Fraud Risk Based):")
-    fig, ax = plt.subplots(figsize=(10, 6))
-    heat_data = d['input_df'].T
-    sns.heatmap(heat_data, annot=True, cmap="Reds", fmt=".2f", ax=ax, cbar_kws={'label': 'Feature Value'})
-    st.pyplot(fig)
+   
+st.markdown("### 📊 Adjusted Anomaly Heatmap (Fraud Risk Based)")
 
-    st.markdown("**🔍 Heatmap Explanation:**")
-    for feature, value in d['input_df'].iloc[0].items():
-        explanation = ""
-        if feature == "transaction_amount":
-            explanation = "Higher values here often flag potential fraud due to large transfers or withdrawals."
-        elif feature == "account_age_days":
-            explanation = "Lower account age (fewer days active) is riskier and flagged more often."
-        elif feature == "login_attempts":
-            explanation = "An unusually high number of login attempts may imply unauthorized access attempts."
-        elif feature == "transaction_duration":
-            explanation = "Very short transaction times may suggest automated fraud or scripted behavior."
-        elif feature == "is_late_night":
-            explanation = "Late-night activity has a higher correlation with fraudulent behavior in historical data."
-        elif feature == "is_negative_balance_after":
-            explanation = "Ending in a negative balance often implies misuse or overdraft attempts."
-        else:
-            explanation = "This value was scored based on deviation from normal behavior learned by the model."
-        st.markdown(f"- **{feature.replace('_', ' ').capitalize()}**: `{value:.2f}` → {explanation}")
+# Behavioral risk logic mapping
+risk_logic = {
+    "Account Age": (user["account_age_days"] < 90, "+1.0", "Account is new", "-1.0", "Account is established"),
+    "Login Attempts": (user["login_attempts"] > 3, "+0.5", "Too many login attempts", "-0.5", "Login count is normal"),
+    "Transaction Amount": (user["transaction_amount"] > 10000, "+1.0", "Large transaction amount", "-1.0", "Amount is modest"),
+    "Time of Day": (user["is_late_night"] == 1, "+0.5", "Suspicious late-night timing", "-0.5", "Normal hours"),
+    "Method": (user["transaction_method"] in ["Online", "Mobile", "Wire"], "+0.5", "Remote transaction method", "-0.5", "In-person method"),
+    "International": (user["is_international"] == "Yes", "+0.5", "International transaction", "-0.5", "Domestic transaction"),
+    "Negative Balance": (user["is_negative_balance_after"] == 1, "+0.5", "Ends in negative balance", "-0.5", "Balance is sufficient"),
+    "Short Duration": (user["transaction_duration"] <= 2, "+0.5", "Suspiciously fast transaction", "-0.5", "Normal duration"),
+    "Young Age": (user["customer_age"] < 24, "+0.5", "Very young customer", "-0.5", "Customer age is mature")
+}
+
+# Prepare data
+heatmap_data = []
+annotations = []
+summary_lines = []
+
+for feature, (condition, pos_score, pos_desc, neg_score, neg_desc) in risk_logic.items():
+    score = 3.0 if "+" in pos_score and condition else 1.0
+    label = pos_score if condition else neg_score
+    desc = pos_desc if condition else neg_desc
+    status = "🔴 High Risk" if score == 3.0 else "🔵 Low Risk"
+
+    heatmap_data.append((feature, score, label))
+    annotations.append(desc)
+    summary_lines.append(f"- **{feature}** → {desc} → **{label}** ({status})")
+
+heatmap_df = pd.DataFrame(heatmap_data, columns=["Feature", "RiskScore", "Label"]).set_index("Feature")
+heatmap_df["Explanation"] = annotations
+
+fig, ax = plt.subplots(figsize=(10, 6))
+sns.heatmap(
+    heatmap_df[["RiskScore"]],
+    annot=heatmap_df[["Label"]],
+    fmt="",
+    cmap="RdBu_r",
+    center=2.0,
+    linewidths=0.5,
+    cbar_kws={"label": "Fraud Likelihood Score"},
+    ax=ax
+)
+plt.title("Adjusted Anomaly Heatmap (Fraud Risk Based)", fontsize=14)
+st.pyplot(fig)
+
+st.markdown("### 📋 Heatmap Summary Explanation:")
+for line in summary_lines:
+    st.markdown(line)
 
 if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
     if st.button("📧 Send Fraud Alert Email"):
