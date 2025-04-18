@@ -26,7 +26,6 @@ def load_data():
 data = load_data()
 data = data.drop(columns=["transaction_id", "branch_code", "device_id"])
 
-# Feature Engineering
 data["is_negative_balance_after"] = (data["balance_after_transaction"] < 0).astype(int)
 data["is_late_night"] = data["time_of_day"].apply(lambda x: 1 if str(x).lower() in ["night", "evening"] else 0)
 
@@ -114,47 +113,38 @@ def compute_behavioral_risk_score(user):
         score += 1.0
     else:
         score -= 1.0
-
     if user["login_attempts"] > 3:
         score += 0.5
     else:
         score -= 0.5
-
     if user["transaction_amount"] > 5000:
         score += 1.0
     else:
         score -= 1.0
-
     if user["is_late_night"] == 1:
         score += 0.5
     else:
         score -= 0.5
-
     if user["transaction_method"] in ["Online", "Mobile", "Wire"]:
         score += 0.5
     else:
         score -= 0.5
-
     if user["is_international"] == "Yes":
         score += 0.5
     else:
         score -= 0.5
-
     if user["is_negative_balance_after"] == 1:
         score += 0.5
     else:
         score -= 0.5
-
     if user["transaction_duration"] <= 2:
         score += 0.5
     else:
         score -= 0.5
-
     if user["customer_age"] < 24:
         score += 0.5
     else:
         score -= 0.5
-
     return max(0, min(5, round(score, 2)))
 
 def send_email_alert(to_email, subject, message):
@@ -190,167 +180,32 @@ if "result_data" not in st.session_state:
 if "email_sent" not in st.session_state:
     st.session_state.email_sent = False
 
-st.markdown("## 🕵️ <span style='font-family: Arial;'>Fraud Detection AI Tool</span>", unsafe_allow_html=True)
-
-with st.form("user_input_form"):
-    st.markdown("### <span style='font-family: Arial;'>Enter transaction data:</span>", unsafe_allow_html=True)
-    user_input = {}
-    for col in features:
-        label = col.replace('_', ' ').capitalize()
-        if col in ["is_negative_balance_after", "is_late_night"]:
-            label += " (Yes or No)"
-            user_input[col] = st.selectbox(label, ["Yes", "No"], key=col)
-        elif col == "account_age_days":
-            label = "Account age (e.g., '12 months' or '2 years')"
-            user_input[col] = st.text_input(label, key=col)
-        elif col == "transaction_duration":
-            label = "Transaction duration (e.g., '3 minutes' or '2 hours')"
-            user_input[col] = st.text_input(label, key=col)
-        elif col == "customer_age":
-            label = "Customer age (e.g., '24 years')"
-            user_input[col] = st.text_input(label, key=col)
-        elif col == "is_international":
-            label += " (categorical)"
-            user_input[col] = st.selectbox(label, ["Yes", "No"], key=col)
-        elif col == "transaction_method":
-            label += " (categorical)"
-            user_input[col] = st.selectbox(label, ["ATM", "Online", "POS", "Mobile", "Wire"], key=col)
-        elif col == "time_of_day":
-            label += " (categorical)"
-            user_input[col] = st.selectbox(label, ["Morning", "Afternoon", "Evening", "Night"], key=col)
-        else:
-            label += " (numeric)"
-            user_input[col] = st.text_input(label, key=col)
-
-    account_owner_email = st.text_input("Account owner's email (for alert):")
-    submitted = st.form_submit_button("Analyze Transaction")
-
-if submitted:
-    user_input = standardize_categoricals(user_input)
-    user_input["account_age_days"] = parse_account_age(user_input.get("account_age_days", "1 year"))
-    user_input["transaction_duration"] = parse_transaction_duration(user_input.get("transaction_duration", "1 minute"))
-    user_input["customer_age"] = parse_customer_age(user_input.get("customer_age", "18"))
-
-    for k in ["transaction_amount", "balance_before_transaction", "balance_after_transaction", "login_attempts"]:
-        user_input[k] = sanitize_numeric(user_input.get(k, "0"))
-
-    user_input["is_negative_balance_after"] = parse_yes_no(user_input.get("is_negative_balance_after", "No"))
-    user_input["is_late_night"] = parse_yes_no(user_input.get("is_late_night", "No"))
-
-    full_row = {col: user_input.get(col, 0 if col not in categorical_cols else "Unknown") for col in features}
-    input_df = pd.DataFrame([full_row])
-
-    for col in categorical_cols:
-        try:
-            input_df[col] = label_encoders[col].transform(input_df[col].astype(str))
-        except:
-            fallback = label_encoders[col].classes_[0]
-            input_df[col] = label_encoders[col].transform([fallback])[0]
-
-    input_df = input_df.astype(float).reindex(columns=X.columns, fill_value=0)
-
-    rating = compute_behavioral_risk_score(user_input)
-    confidence_score = calculate_confidence_from_rating(rating)
-
-    prediction = isolation_model.predict(input_df)[0]
-    result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
-
-    st.session_state.submitted = True
-    st.session_state.result_data = {
-        "user_input": user_input,
-        "result": result,
-        "confidence_score": confidence_score,
-        "behavior_rating": rating,
-        "email": account_owner_email,
-        "input_df": input_df
-    }
-
+# GPT logic to run after result calculated
 if st.session_state.submitted:
     d = st.session_state.result_data
-    st.markdown(f"### Prediction: **{d['result']}**")
-    st.markdown(f"**Confidence Level:** {d['confidence_score']}% Confident")
 
-    st.markdown("### 🧠 Behavioral Risk Rating Breakdown")
-    score = d['behavior_rating']
-    user = d['user_input']
-    score_factors = []
+    explanation_lines = [
+        f"- Transaction Amount: ${d['user_input']['transaction_amount']} – higher amounts are often suspicious.",
+        f"- Account Age: {d['user_input']['account_age_days']} days – newer accounts tend to have higher risk.",
+        f"- Login Attempts: {d['user_input']['login_attempts']} – excessive login attempts raise red flags.",
+        f"- Time of Day: {d['user_input']['time_of_day']} – late hours can indicate attempts to avoid detection.",
+        f"- Transaction Method: {d['user_input']['transaction_method']} – remote methods can mask identity."
+    ]
 
-    score_factors.append(("Account Age", +1.0 if user["account_age_days"] < 90 else -1.0, "Account is new" if user["account_age_days"] < 90 else "Account is established"))
-    score_factors.append(("Login Attempts", +0.5 if user["login_attempts"] > 3 else -0.5, "Too many login attempts" if user["login_attempts"] > 3 else "Login count is normal"))
-    score_factors.append(("Transaction Amount", +1.0 if user["transaction_amount"] > 5000 else -1.0, "Large transaction amount" if user["transaction_amount"] > 5000 else "Amount is modest"))
-    score_factors.append(("Time of Day", +0.5 if user["is_late_night"] == 1 else -0.5, "Suspicious late-night timing" if user["is_late_night"] == 1 else "Normal hours"))
-    score_factors.append(("Method", +0.5 if user["transaction_method"] in ["Online", "Mobile", "Wire"] else -0.5, "Remote transaction method" if user["transaction_method"] in ["Online", "Mobile", "Wire"] else "In-person method"))
-    score_factors.append(("International", +0.5 if user["is_international"] == "Yes" else -0.5, "International transaction" if user["is_international"] == "Yes" else "Domestic transaction"))
-    score_factors.append(("Negative Balance", +0.5 if user["is_negative_balance_after"] == 1 else -0.5, "Ends in negative balance" if user["is_negative_balance_after"] == 1 else "Balance is sufficient"))
-    score_factors.append(("Short Duration", +0.5 if user["transaction_duration"] <= 2 else -0.5, "Suspiciously fast transaction" if user["transaction_duration"] <= 2 else "Normal duration"))
-    score_factors.append(("Young Age", +0.5 if user["customer_age"] < 24 else -0.5, "Very young customer" if user["customer_age"] < 24 else "Customer age is mature"))
+    prompt = f"""
+Given the transaction data: {d['user_input']},\nPredicted: {d['result']} with a confidence score of {d['confidence_score']}%,\nBehavioral Risk Rating: {d['behavior_rating']}/5\nExplain these findings to the user in layman's terms.
+"""
 
-    st.markdown(f"**Total Behavioral Risk Rating: {score} / 5**")
-    for factor, impact, reason in score_factors:
-        sign = "+" if impact > 0 else "–"
-        st.markdown(f"- **{factor}**: {sign}{abs(impact)} → _{reason}_")
-
-    if score >= 4.0:
-        summary = "This transaction shows multiple high-risk traits. Please investigate urgently."
-    elif score >= 2.5:
-        summary = "There are moderate risk indicators present. Further review is recommended."
-    else:
-        summary = "Low behavioral risk detected. Transaction appears typical."
-
-    st.markdown(f"📌 **Summary**: {summary}")
-    st.markdown("### Explanation:")
-    st.markdown(d.get('explanation', 'Explanation not available.'))
-
-    st.markdown("### 🔍 Feature Highlights Contributing to Detection:")
-    for insight in d.get('anomaly_insights', []):
-        st.markdown(insight)
-
-    st.markdown("### 📊 Adjusted Anomaly Heatmap (Fraud Risk Based):")
-    fig, ax = plt.subplots(figsize=(10, 6))
-    heat_data = d['input_df'].T
-    sns.heatmap(heat_data, annot=True, cmap="Reds", fmt=".2f", ax=ax, cbar_kws={'label': 'Feature Value'})
-    st.pyplot(fig)
-
-    st.markdown("**🔍 Heatmap Explanation:**")
-    for feature, value in d['input_df'].iloc[0].items():
-        explanation = ""
-        if feature == "transaction_amount":
-            explanation = "Higher values here often flag potential fraud due to large transfers or withdrawals."
-        elif feature == "account_age_days":
-            explanation = "Lower account age (fewer days active) is riskier and flagged more often."
-        elif feature == "login_attempts":
-            explanation = "An unusually high number of login attempts may imply unauthorized access attempts."
-        elif feature == "transaction_duration":
-            explanation = "Very short transaction times may suggest automated fraud or scripted behavior."
-        elif feature == "is_late_night":
-            explanation = "Late-night activity has a higher correlation with fraudulent behavior in historical data."
-        elif feature == "is_negative_balance_after":
-            explanation = "Ending in a negative balance often implies misuse or overdraft attempts."
-        else:
-            explanation = "This value was scored based on deviation from normal behavior learned by the model."
-        st.markdown(f"- **{feature.replace('_', ' ').capitalize()}**: `{value:.2f}` → {explanation}")
-
-    if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
-    if st.button("📧 Send Fraud Alert Email"):
-        tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
-        email_sent = send_email_alert(
-            to_email=d['email'],
-            subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
-            message=f"""A transaction was flagged with a **confidence level of {d['confidence_score']}%**.
-
-Behavioral Risk Rating: {d['behavior_rating']} / 5
-
-Transaction Details:
-{tx}
-
-Recommended Actions:
-- Verify this transaction
-- Contact your bank if unauthorized
-- Monitor account activity immediately."""
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are a helpful fraud risk advisor who explains AI-based anomaly detection decisions."},
+                {"role": "user", "content": prompt}
+            ]
         )
-        if email_sent:
-            st.success("✅ Alert sent to account owner and admin.")
-            st.session_state.email_sent = True
-        else:
-            st.error("❌ Email failed to send.")
-
+        d['explanation'] = response.choices[0].message.content
+        d['anomaly_insights'] = explanation_lines
+    except Exception as e:
+        d['explanation'] = "Unable to generate explanation."
+        d['anomaly_insights'] = explanation_lines
