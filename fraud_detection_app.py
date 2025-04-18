@@ -384,18 +384,12 @@ if st.session_state.submitted:
     for line in summary_lines:
         st.markdown(line)
 
-   # 🔍 DEBUG INFO TO SEE WHY IT'S NOT SHOWING
-    st.markdown(f"""
-    ---
-    ### 🚨 Debug: Email Alert Trigger Check
-    - Result: `{d['result']}`
-    - Confidence: `{d['confidence_score']}`
-    - Email: `{d.get('email')}`
-    - Email Sent Already? `{st.session_state.email_sent}`
-    ---
-    """)
+       # 🔁 Optional reset button to re-show the email button for dev testing
+    if st.button("🔄 Reset Email Sent Flag (Dev Only)"):
+        st.session_state.email_sent = False
+        st.success("✅ Email sent flag has been reset. Email button will now reappear.")
 
-    # ✅ EMAIL BUTTON
+    # 📧 EMAIL BUTTON LOGIC
     if (
         d['result'] == "Fraudulent"
         and d['confidence_score'] >= 50
@@ -423,7 +417,6 @@ Recommended Actions:
 - Contact your bank if unauthorized
 - Monitor account activity immediately."""
             )
-
             if email_sent:
                 st.success("✅ Alert sent to account owner and admin.")
                 st.session_state.email_sent = True
