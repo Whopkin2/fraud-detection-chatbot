@@ -93,20 +93,13 @@ def standardize_categoricals(user_input):
     return user_input
 
 def calculate_confidence_from_rating(score):
-    if score >= 5.0:
-        return 95.0
-    elif score >= 4.0:
-        return 85.0
-    elif score >= 3.5:
-        return 75.0
-    elif score >= 2.5:
-        return 60.0
-    elif score >= 2.0:
-        return 50.0
-    elif score >= 1.0:
-        return 30.0
-    else:
-        return 10.0
+    # We want confidence to be lowest at 2.5 and highest at 0 or 5
+    distance_from_center = abs(score - 2.5)
+
+    # Scale distance from 0–2.5 into a 50%–100% confidence range
+    confidence = 50.0 + (distance_from_center / 2.5) * 50.0
+
+    return round(confidence, 2)
 
 def compute_behavioral_risk_score(user):
     score = 0
