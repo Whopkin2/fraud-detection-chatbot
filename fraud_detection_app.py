@@ -250,11 +250,12 @@ if submitted:
     input_df = input_df.astype(float).reindex(columns=X.columns, fill_value=0)
 
     rating = compute_behavioral_risk_score(user_input)
-    confidence_score = calculate_confidence_from_rating(rating)
+confidence_score = calculate_confidence_from_rating(rating)
 
-    prediction = isolation_model.predict(input_df)[0]
-    result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
+prediction = isolation_model.predict(input_df)[0]
+result = "Fraudulent" if prediction == -1 else "Not Fraudulent"  # 👈 MUST come before you use `result`
 
+# ✅ Now you're safe to call GPT
 explanation_prompt = f"""
 Given the transaction data: {user_input},
 Predicted: {result} with a confidence score of {confidence_score}%,
