@@ -331,7 +331,7 @@ if st.session_state.submitted:
         st.markdown(f"- **{feature.replace('_', ' ').capitalize()}**: `{value:.2f}` → {explanation}")
 
     if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
-    if st.button("📧 Send Fraud Alert Email"):
+        if st.button("📧 Send Fraud Alert Email"):
         tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
         email_sent = send_email_alert(
             to_email=d['email'],
