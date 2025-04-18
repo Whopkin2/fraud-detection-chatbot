@@ -357,13 +357,13 @@ if st.session_state.submitted:
             explanation = "This value was scored based on deviation from normal behavior learned by the model."
         st.markdown(f"- **{feature.replace('_', ' ').capitalize()}**: `{value:.2f}` → {explanation}")
 
-    if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
-        if st.button("📧 Send Fraud Alert Email"):
-            tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
-            email_sent = send_email_alert(
-                to_email=d['email'],
-                subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
-                message=f"""A transaction was flagged with a **confidence level of {d['confidence_score']}%**.
+if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
+    if st.button("📧 Send Fraud Alert Email"):
+        tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
+        email_sent = send_email_alert(
+            to_email=d['email'],
+            subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
+            message=f"""A transaction was flagged with a **confidence level of {d['confidence_score']}%**.
 
 Behavioral Risk Rating: {d['behavior_rating']} / 5
 
@@ -375,8 +375,10 @@ Recommended Actions:
 - Contact your bank if unauthorized
 - Monitor account activity immediately."""
         )
+
         if email_sent:
             st.success("✅ Alert sent to account owner and admin.")
             st.session_state.email_sent = True
         else:
             st.error("❌ Email failed to send.")
+
