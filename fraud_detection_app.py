@@ -285,7 +285,7 @@ if submitted:
         "result": result,
         "confidence_score": confidence_score,
         "behavior_rating": rating,
-        "email": account_owner_email,
+        "email": account_owner_email.strip() if account_owner_email.strip() else None,
         "input_df": input_df,
         "explanation": explanation,
         "anomaly_insights": []  # You can populate this if you want more GPT-generated highlights
