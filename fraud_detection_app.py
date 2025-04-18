@@ -250,6 +250,11 @@ if submitted:
 
     # 3. Get model prediction
     prediction = isolation_model.predict(input_df)[0]
+    if rating >= 3.0:
+    result = "Fraudulent"
+elif rating < 2.0:
+    result = "Not Fraudulent"
+else:
     result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
 
     # 4. Generate GPT explanation
