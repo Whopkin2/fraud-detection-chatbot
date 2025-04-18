@@ -385,23 +385,23 @@ if st.session_state.submitted:
         st.markdown(line)
 
 # ✅ EMAIL BUTTON (Paste this below the heatmap summary block)
-if (
-    d['result'] == "Fraudulent"
-    and d['confidence_score'] >= 50
-    and d.get('email') is not None
-    and d.get('email').strip() != ""
-    and not st.session_state.email_sent
-):
-    st.markdown("---")
-    st.markdown("### 📧 Email Alert")
-    st.markdown(f"**Ready to alert `{d['email']}` about the flagged transaction.**")
+    if (
+        d['result'] == "Fraudulent"
+        and d['confidence_score'] >= 50
+        and d.get('email') is not None
+        and d.get('email').strip() != ""
+        and not st.session_state.email_sent
+    ):
+        st.markdown("---")
+        st.markdown("### 📧 Email Alert")
+        st.markdown(f"**Ready to alert `{d['email']}` about the flagged transaction.**")
 
-    if st.button("📧 Send Fraud Alert Email"):
-        tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
-        email_sent = send_email_alert(
-            to_email=d['email'].strip(),
-            subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
-            message=f"""A transaction was flagged with a **confidence level of {d['confidence_score']}%**.
+        if st.button("📧 Send Fraud Alert Email"):
+            tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
+            email_sent = send_email_alert(
+                to_email=d['email'].strip(),
+                subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
+                message=f"""A transaction was flagged with a **confidence level of {d['confidence_score']}%**.
 
 Behavioral Risk Rating: {d['behavior_rating']} / 5
 
@@ -414,8 +414,8 @@ Recommended Actions:
 - Monitor account activity immediately."""
         )
 
-        if email_sent:
-            st.success("✅ Alert sent to account owner and admin.")
-            st.session_state.email_sent = True
-        else:
-            st.error("❌ Email failed to send.")
+            if email_sent:
+                st.success("✅ Alert sent to account owner and admin.")
+                st.session_state.email_sent = True
+            else:
+                st.error("❌ Email failed to send.")
