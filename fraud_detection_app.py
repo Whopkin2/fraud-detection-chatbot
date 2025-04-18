@@ -330,89 +330,67 @@ if st.session_state.submitted:
         unsafe_allow_html=True
     )
 
-
     st.markdown("### 🔍 Feature Highlights Contributing to Detection:")
     for insight in d.get('anomaly_insights', []):
         st.markdown(insight)
 
-   
-st.markdown("### 📊 Anomaly Heatmap")
+    st.markdown("### 📊 Anomaly Heatmap")
 
-# Behavioral risk logic mapping
-risk_logic = {
-    "Account Age": (user["account_age_days"] < 90, "+1.0", "Account is new", "-1.0", "Account is established"),
-    "Login Attempts": (user["login_attempts"] > 3, "+0.5", "Too many login attempts", "-0.5", "Login count is normal"),
-    "Transaction Amount": (user["transaction_amount"] > 10000, "+1.0", "Large transaction amount", "-1.0", "Amount is modest"),
-    "Time of Day": (user["is_late_night"] == 1, "+0.5", "Suspicious late-night timing", "-0.5", "Normal hours"),
-    "Method": (user["transaction_method"] in ["Online", "Mobile", "Wire"], "+0.5", "Remote transaction method", "-0.5", "In-person method"),
-    "International": (user["is_international"] == "Yes", "+0.5", "International transaction", "-0.5", "Domestic transaction"),
-    "Negative Balance": (user["is_negative_balance_after"] == 1, "+0.5", "Ends in negative balance", "-0.5", "Balance is sufficient"),
-    "Short Duration": (user["transaction_duration"] <= 2, "+0.5", "Suspiciously fast transaction", "-0.5", "Normal duration"),
-    "Young Age": (user["customer_age"] < 24, "+0.5", "Very young customer", "-0.5", "Customer age is mature")
-}
+    risk_logic = {
+        "Account Age": (user["account_age_days"] < 90, "+1.0", "Account is new", "-1.0", "Account is established"),
+        "Login Attempts": (user["login_attempts"] > 3, "+0.5", "Too many login attempts", "-0.5", "Login count is normal"),
+        "Transaction Amount": (user["transaction_amount"] > 10000, "+1.0", "Large transaction amount", "-1.0", "Amount is modest"),
+        "Time of Day": (user["is_late_night"] == 1, "+0.5", "Suspicious late-night timing", "-0.5", "Normal hours"),
+        "Method": (user["transaction_method"] in ["Online", "Mobile", "Wire"], "+0.5", "Remote transaction method", "-0.5", "In-person method"),
+        "International": (user["is_international"] == "Yes", "+0.5", "International transaction", "-0.5", "Domestic transaction"),
+        "Negative Balance": (user["is_negative_balance_after"] == 1, "+0.5", "Ends in negative balance", "-0.5", "Balance is sufficient"),
+        "Short Duration": (user["transaction_duration"] <= 2, "+0.5", "Suspiciously fast transaction", "-0.5", "Normal duration"),
+        "Young Age": (user["customer_age"] < 24, "+0.5", "Very young customer", "-0.5", "Customer age is mature")
+    }
 
-# Prepare data
-heatmap_data = []
-annotations = []
-summary_lines = []
+    heatmap_data = []
+    annotations = []
+    summary_lines = []
 
-for feature, (condition, pos_score, pos_desc, neg_score, neg_desc) in risk_logic.items():
-    score = 3.0 if "+" in pos_score and condition else 1.0
-    label = pos_score if condition else neg_score
-    desc = pos_desc if condition else neg_desc
-    status = "🔴 High Risk" if score == 3.0 else "🔵 Low Risk"
+    for feature, (condition, pos_score, pos_desc, neg_score, neg_desc) in risk_logic.items():
+        score = 3.0 if "+" in pos_score and condition else 1.0
+        label = pos_score if condition else neg_score
+        desc = pos_desc if condition else neg_desc
+        status = "🔴 High Risk" if score == 3.0 else "🔵 Low Risk"
 
-    heatmap_data.append((feature, score, label))
-    annotations.append(desc)
-    summary_lines.append(f"- **{feature}** → {desc} → **{label}** ({status})")
+        heatmap_data.append((feature, score, label))
+        annotations.append(desc)
+        summary_lines.append(f"- **{feature}** → {desc} → **{label}** ({status})")
 
-heatmap_df = pd.DataFrame(heatmap_data, columns=["Feature", "RiskScore", "Label"]).set_index("Feature")
-heatmap_df["Explanation"] = annotations
+    heatmap_df = pd.DataFrame(heatmap_data, columns=["Feature", "RiskScore", "Label"]).set_index("Feature")
+    heatmap_df["Explanation"] = annotations
 
-fig, ax = plt.subplots(figsize=(10, 6))
-sns.heatmap(
-    heatmap_df[["RiskScore"]],
-    annot=heatmap_df[["Label"]],
-    fmt="",
-    cmap="RdBu_r",
-    center=2.0,
-    linewidths=0.5,
-    cbar_kws={"label": "Fraud Likelihood Score"},
-    ax=ax
-)
-plt.title("Anomaly Heatmap", fontsize=14)
-st.pyplot(fig)
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.heatmap(
+        heatmap_df[["RiskScore"]],
+        annot=heatmap_df[["Label"]],
+        fmt="",
+        cmap="RdBu_r",
+        center=2.0,
+        linewidths=0.5,
+        cbar_kws={"label": "Fraud Likelihood Score"},
+        ax=ax
+    )
+    plt.title("Anomaly Heatmap", fontsize=14)
+    st.pyplot(fig)
 
-st.markdown("### 📋 Heatmap Summary Explanation:")
-for line in summary_lines:
-    st.markdown(line)
+    st.markdown("### 📋 Heatmap Summary Explanation:")
+    for line in summary_lines:
+        st.markdown(line)
 
-# --- 📧 EMAIL ALERT SECTION ---
-st.markdown("### 📬 Email Alert")
-
-# Debug display (optional – remove if not needed)
-st.write("📧 Email Debug:", {
-    "Result": d.get('result'),
-    "Confidence Score": d.get('confidence_score'),
-    "Email Provided": bool(d.get('email')),
-    "Already Sent": st.session_state.email_sent
-})
-
-# Check all conditions
-should_show_email_button = (
-    d.get('result') == "Fraudulent" and
-    d.get('confidence_score', 0) >= 50 and
-    d.get('email') and
-    not st.session_state.email_sent
-)
-
-if should_show_email_button:
-    if st.button("📧 Send Fraud Alert Email"):
-        tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
-        email_sent = send_email_alert(
-            to_email=d['email'],
-            subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
-            message=f"""A transaction was flagged with a **confidence level of {d['confidence_score']}%**.
+    # 📧 EMAIL BUTTON
+    if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d.get('email') and not st.session_state.email_sent:
+        if st.button("📧 Send Fraud Alert Email"):
+            tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
+            email_sent = send_email_alert(
+                to_email=d['email'],
+                subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
+                message=f"""A transaction was flagged with a **confidence level of {d['confidence_score']}%**.
 
 Behavioral Risk Rating: {d['behavior_rating']} / 5
 
@@ -423,11 +401,9 @@ Recommended Actions:
 - Verify this transaction
 - Contact your bank if unauthorized
 - Monitor account activity immediately."""
-        )
-        if email_sent:
-            st.success("✅ Alert sent to account owner and admin.")
-            st.session_state.email_sent = True
-        else:
-            st.error("❌ Email failed to send.")
-else:
-    st.info("📭 No email alert needed – risk too low or email not provided.")
+            )
+            if email_sent:
+                st.success("✅ Alert sent to account owner and admin.")
+                st.session_state.email_sent = True
+            else:
+                st.error("❌ Email failed to send.")
