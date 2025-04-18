@@ -218,6 +218,79 @@ with st.form("user_input_form"):
     account_owner_email = st.text_input("Account owner's email (for alert):")
     submitted = st.form_submit_button("Analyze Transaction")
 
+if submitted:
+    user_input = standardize_categoricals(user_input)
+    user_input["account_age_days"] = parse_account_age(user_input.get("account_age_days", "1 year"))
+    user_input["transaction_duration"] = parse_transaction_duration(user_input.get("transaction_duration", "1 minute"))
+    user_input["customer_age"] = parse_customer_age(user_input.get("customer_age", "18"))
+
+    for k in ["transaction_amount", "balance_before_transaction", "balance_after_transaction", "login_attempts"]:
+        user_input[k] = sanitize_numeric(user_input.get(k, "0"))
+
+    user_input["is_negative_balance_after"] = parse_yes_no(user_input.get("is_negative_balance_after", "No"))
+    user_input["is_late_night"] = parse_yes_no(user_input.get("is_late_night", "No"))
+
+    full_row = {col: user_input.get(col, 0 if col not in categorical_cols else "Unknown") for col in features}
+    input_df = pd.DataFrame([full_row])
+
+    for col in categorical_cols:
+        try:
+            input_df[col] = label_encoders[col].transform(input_df[col].astype(str))
+        except:
+            fallback = label_encoders[col].classes_[0]
+            input_df[col] = label_encoders[col].transform([fallback])[0]
+
+    input_df = input_df.astype(float).reindex(columns=X.columns, fill_value=0)
+
+    # 1. Compute behavioral risk rating
+    rating = compute_behavioral_risk_score(user_input)
+
+    # 2. Compute confidence score from rating
+    confidence_score = calculate_confidence_from_rating(rating)
+
+    # 3. Get model prediction
+    prediction = isolation_model.predict(input_df)[0]
+    if rating >= 3.0:
+        result = "Fraudulent"
+    elif rating < 2.0:
+        result = "Not Fraudulent"
+    else:
+        result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
+
+
+    # 4. Generate GPT explanation
+    explanation_prompt = f"""
+    Given the transaction data: {user_input},
+    Predicted: {result} with a confidence score of {confidence_score}%,
+    Behavioral Risk Rating: {rating}/5
+    Explain these findings to the user in layman's terms.
+    """
+
+    try:
+        gpt_response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are a helpful fraud risk advisor who explains AI-based anomaly detection decisions."},
+                {"role": "user", "content": explanation_prompt}
+            ]
+        )
+        explanation = gpt_response.choices[0].message.content
+    except Exception as e:
+        explanation = f"❌ GPT explanation failed: {e}"
+
+    # 5. Store everything in session state
+    st.session_state.submitted = True
+    st.session_state.result_data = {
+        "user_input": user_input,
+        "result": result,
+        "confidence_score": confidence_score,
+        "behavior_rating": rating,
+        "email": account_owner_email,
+        "input_df": input_df,
+        "explanation": explanation,
+        "anomaly_insights": []  # You can populate this if you want more GPT-generated highlights
+    }
+
 if st.session_state.submitted:
     d = st.session_state.result_data
     st.markdown(f"### Prediction: **{d['result']}**")
@@ -251,25 +324,31 @@ if st.session_state.submitted:
         summary = "Low behavioral risk detected. Transaction appears typical."
 
     st.markdown(f"📌 **Summary**: {summary}")
-
-    # ✅ Cleaned GPT explanation
-    explanation = d.get("explanation", "Explanation not available.")
-    explanation_cleaned = explanation.replace("\n", " ").replace("  ", " ").strip()
     st.markdown("### 🧠 Explanation:")
     st.markdown(
-        f"<div style='font-family: Arial; font-size: 16px; line-height: 1.6;'>{explanation_cleaned}</div>",
+        f"<div style='font-family: Arial; font-size: 16px; line-height: 1.6;'>{d.get('explanation', 'Explanation not available.')}</div>",
         unsafe_allow_html=True
     )
 
-    # ✅ Anomaly insights
     st.markdown("### 🔍 Feature Highlights Contributing to Detection:")
     for insight in d.get('anomaly_insights', []):
         st.markdown(insight)
 
-    # ✅ Heatmap + Summary
     st.markdown("### 📊 Adjusted Anomaly Heatmap (Fraud Risk Based):")
 
-    # Same heatmap logic already in your code
+    # Behavioral risk logic mapping
+    risk_logic = {
+        "Account Age": (user["account_age_days"] < 90, "+1.0", "Account is new", "-1.0", "Account is established"),
+        "Login Attempts": (user["login_attempts"] > 3, "+0.5", "Too many login attempts", "-0.5", "Login count is normal"),
+        "Transaction Amount": (user["transaction_amount"] > 5000, "+1.0", "Large transaction amount", "-1.0", "Amount is modest"),
+        "Time of Day": (user["is_late_night"] == 1, "+0.5", "Suspicious late-night timing", "-0.5", "Normal hours"),
+        "Method": (user["transaction_method"] in ["Online", "Mobile", "Wire"], "+0.5", "Remote transaction method", "-0.5", "In-person method"),
+        "International": (user["is_international"] == "Yes", "+0.5", "International transaction", "-0.5", "Domestic transaction"),
+        "Negative Balance": (user["is_negative_balance_after"] == 1, "+0.5", "Ends in negative balance", "-0.5", "Balance is sufficient"),
+        "Short Duration": (user["transaction_duration"] <= 2, "+0.5", "Suspiciously fast transaction", "-0.5", "Normal duration"),
+        "Young Age": (user["customer_age"] < 24, "+0.5", "Very young customer", "-0.5", "Customer age is mature")
+    }
+
     heatmap_data = []
     annotations = []
     summary_lines = []
@@ -305,7 +384,7 @@ if st.session_state.submitted:
     for line in summary_lines:
         st.markdown(line)
 
-    # ✅ Email button section
+    # 📧 EMAIL BUTTON
     if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d.get('email') and not st.session_state.email_sent:
         if st.button("📧 Send Fraud Alert Email"):
             tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
