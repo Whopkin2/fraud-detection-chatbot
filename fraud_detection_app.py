@@ -249,13 +249,17 @@ if submitted:
 
     input_df = input_df.astype(float).reindex(columns=X.columns, fill_value=0)
 
-    rating = compute_behavioral_risk_score(user_input)
+# 1. Compute behavioral risk rating
+rating = compute_behavioral_risk_score(user_input)
+
+# 2. Compute confidence score from rating
 confidence_score = calculate_confidence_from_rating(rating)
 
+# 3. Get model prediction
 prediction = isolation_model.predict(input_df)[0]
-result = "Fraudulent" if prediction == -1 else "Not Fraudulent"  # 👈 MUST come before you use `result`
+result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
 
-# ✅ Now you're safe to call GPT
+# 4. Generate GPT explanation
 explanation_prompt = f"""
 Given the transaction data: {user_input},
 Predicted: {result} with a confidence score of {confidence_score}%,
@@ -275,15 +279,18 @@ try:
 except Exception as e:
     explanation = f"❌ GPT explanation failed: {e}"
 
-    st.session_state.submitted = True
-    st.session_state.result_data = {
-        "user_input": user_input,
-        "result": result,
-        "confidence_score": confidence_score,
-        "behavior_rating": rating,
-        "email": account_owner_email,
-        "input_df": input_df
-    }
+# 5. Store everything in session state
+st.session_state.submitted = True
+st.session_state.result_data = {
+    "user_input": user_input,
+    "result": result,
+    "confidence_score": confidence_score,
+    "behavior_rating": rating,
+    "email": account_owner_email,
+    "input_df": input_df,
+    "explanation": explanation,
+    "anomaly_insights": []  # You can populate this if you want more GPT-generated highlights
+}
 
 if st.session_state.submitted:
     d = st.session_state.result_data
