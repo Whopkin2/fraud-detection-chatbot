@@ -389,7 +389,7 @@ if st.session_state.submitted:
         st.session_state.email_sent = False
         st.success("✅ Email sent flag has been reset. Email button will now reappear.")
 
-    # 📧 EMAIL BUTTON LOGIC
+      # 📧 EMAIL ALERT BUTTON
     if (
         d['result'] == "Fraudulent"
         and d['confidence_score'] >= 50
