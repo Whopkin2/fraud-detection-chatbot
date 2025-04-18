@@ -324,9 +324,12 @@ if st.session_state.submitted:
         summary = "Low behavioral risk detected. Transaction appears typical."
 
     st.markdown(f"📌 **Summary**: {summary}")
+    explanation = d.get("explanation", "Explanation not available.")
+    explanation_cleaned = explanation.replace("\n", " ").replace("  ", " ").strip()
+
     st.markdown("### 🧠 Explanation:")
     st.markdown(
-        f"<div style='font-family: Arial; font-size: 16px; line-height: 1.6;'>{d.get('explanation', 'Explanation not available.')}</div>",
+        f"<div style='font-family: Arial; font-size: 16px; line-height: 1.6;'>{explanation_cleaned}</div>",
         unsafe_allow_html=True
     )
 
