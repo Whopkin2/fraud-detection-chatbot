@@ -380,14 +380,14 @@ sns.heatmap(
     cbar_kws={"label": "Fraud Likelihood Score"},
     ax=ax
 )
-plt.title("Adjusted Anomaly Heatmap (Fraud Risk Based)", fontsize=14)
+plt.title("Anomaly Heatmap", fontsize=14)
 st.pyplot(fig)
 
 st.markdown("### 📋 Heatmap Summary Explanation:")
 for line in summary_lines:
     st.markdown(line)
 
-if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
+if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d.get('email') and not st.session_state.email_sent:
     if st.button("📧 Send Fraud Alert Email"):
         tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
         email_sent = send_email_alert(
@@ -411,4 +411,3 @@ Recommended Actions:
             st.session_state.email_sent = True
         else:
             st.error("❌ Email failed to send.")
-
