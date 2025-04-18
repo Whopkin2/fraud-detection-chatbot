@@ -384,7 +384,7 @@ if st.session_state.submitted:
     for line in summary_lines:
         st.markdown(line)
 
-    # 📧 EMAIL BUTTON
+    # ✅ Email button goes here — inside the same block
     if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d.get('email') and not st.session_state.email_sent:
         if st.button("📧 Send Fraud Alert Email"):
             tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
