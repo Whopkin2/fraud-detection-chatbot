@@ -332,11 +332,11 @@ if st.session_state.submitted:
 
     if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d['email'] and not st.session_state.email_sent:
         if st.button("📧 Send Fraud Alert Email"):
-        tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
-        email_sent = send_email_alert(
-            to_email=d['email'],
-            subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
-            message=f"""A transaction was flagged with a **confidence level of {d['confidence_score']}%**.
+            tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
+            email_sent = send_email_alert(
+                to_email=d['email'],
+                subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
+                message=f"""A transaction was flagged with a **confidence level of {d['confidence_score']}%**.
 
 Behavioral Risk Rating: {d['behavior_rating']} / 5
 
