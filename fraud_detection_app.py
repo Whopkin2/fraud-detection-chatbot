@@ -255,22 +255,21 @@ if submitted:
     prediction = isolation_model.predict(input_df)[0]
     result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
 
-    explanation_prompt = f"""
-    Given the transaction data: {user_input},
-    Predicted: {result} with a confidence score of {confidence_score}%,
-    Behavioral Risk Rating: {rating}/5
-    Explain these findings to the user in layman's terms.
+explanation_prompt = f"""
+Given the transaction data: {user_input},
+Predicted: {result} with a confidence score of {confidence_score}%,
+Behavioral Risk Rating: {rating}/5
+Explain these findings to the user in layman's terms.
 """
 
-    try:
-        gpt_response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "You are a helpful fraud risk advisor who explains AI-based anomaly detection decisions."},
-                {"role": "user", "content": explanation_prompt}
+try:
+    gpt_response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": "You are a helpful fraud risk advisor who explains AI-based anomaly detection decisions."},
+            {"role": "user", "content": explanation_prompt}
         ]
     )
-        
     explanation = gpt_response.choices[0].message.content
 except Exception as e:
     explanation = f"❌ GPT explanation failed: {e}"
