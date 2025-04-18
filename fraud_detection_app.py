@@ -336,7 +336,7 @@ if st.session_state.submitted:
         st.markdown(insight)
 
    
-st.markdown("### 📊 Adjusted Anomaly Heatmap (Fraud Risk Based)")
+st.markdown("### 📊 Anomaly Heatmap")
 
 # Behavioral risk logic mapping
 risk_logic = {
