@@ -387,7 +387,26 @@ st.markdown("### 📋 Heatmap Summary Explanation:")
 for line in summary_lines:
     st.markdown(line)
 
-if d['result'] == "Fraudulent" and d['confidence_score'] >= 50 and d.get('email') and not st.session_state.email_sent:
+# --- 📧 EMAIL ALERT SECTION ---
+st.markdown("### 📬 Email Alert")
+
+# Debug display (optional – remove if not needed)
+st.write("📧 Email Debug:", {
+    "Result": d.get('result'),
+    "Confidence Score": d.get('confidence_score'),
+    "Email Provided": bool(d.get('email')),
+    "Already Sent": st.session_state.email_sent
+})
+
+# Check all conditions
+should_show_email_button = (
+    d.get('result') == "Fraudulent" and
+    d.get('confidence_score', 0) >= 50 and
+    d.get('email') and
+    not st.session_state.email_sent
+)
+
+if should_show_email_button:
     if st.button("📧 Send Fraud Alert Email"):
         tx = "\n".join([f"{k.replace('_', ' ').capitalize()}: {v}" for k, v in d['user_input'].items()])
         email_sent = send_email_alert(
@@ -405,9 +424,10 @@ Recommended Actions:
 - Contact your bank if unauthorized
 - Monitor account activity immediately."""
         )
-
         if email_sent:
             st.success("✅ Alert sent to account owner and admin.")
             st.session_state.email_sent = True
         else:
             st.error("❌ Email failed to send.")
+else:
+    st.info("📭 No email alert needed – risk too low or email not provided.")
