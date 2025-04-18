@@ -303,7 +303,7 @@ if st.session_state.submitted:
 
     score_factors.append(("Account Age", +1.0 if user["account_age_days"] < 90 else -1.0, "Account is new" if user["account_age_days"] < 90 else "Account is established"))
     score_factors.append(("Login Attempts", +0.5 if user["login_attempts"] > 3 else -0.5, "Too many login attempts" if user["login_attempts"] > 3 else "Login count is normal"))
-    score_factors.append(("Transaction Amount", +1.0 if user["transaction_amount"] > 10000 else -1.0, "Large transaction amount" if user["transaction_amount"] > 10000 else "Amount is modest"))
+    score_factors.append(("Transaction Amount", +1.0 if user["transaction_amount"] > 5000 else -1.0, "Large transaction amount" if user["transaction_amount"] > 5000 else "Amount is modest"))
     score_factors.append(("Time of Day", +0.5 if user["is_late_night"] == 1 else -0.5, "Suspicious late-night timing" if user["is_late_night"] == 1 else "Normal hours"))
     score_factors.append(("Method", +0.5 if user["transaction_method"] in ["Online", "Mobile", "Wire"] else -0.5, "Remote transaction method" if user["transaction_method"] in ["Online", "Mobile", "Wire"] else "In-person method"))
     score_factors.append(("International", +0.5 if user["is_international"] == "Yes" else -0.5, "International transaction" if user["is_international"] == "Yes" else "Domestic transaction"))
@@ -334,12 +334,13 @@ if st.session_state.submitted:
     for insight in d.get('anomaly_insights', []):
         st.markdown(insight)
 
-    st.markdown("### 📊 Anomaly Heatmap")
+    st.markdown("### 📊 Adjusted Anomaly Heatmap (Fraud Risk Based):")
 
+    # Behavioral risk logic mapping
     risk_logic = {
         "Account Age": (user["account_age_days"] < 90, "+1.0", "Account is new", "-1.0", "Account is established"),
         "Login Attempts": (user["login_attempts"] > 3, "+0.5", "Too many login attempts", "-0.5", "Login count is normal"),
-        "Transaction Amount": (user["transaction_amount"] > 10000, "+1.0", "Large transaction amount", "-1.0", "Amount is modest"),
+        "Transaction Amount": (user["transaction_amount"] > 5000, "+1.0", "Large transaction amount", "-1.0", "Amount is modest"),
         "Time of Day": (user["is_late_night"] == 1, "+0.5", "Suspicious late-night timing", "-0.5", "Normal hours"),
         "Method": (user["transaction_method"] in ["Online", "Mobile", "Wire"], "+0.5", "Remote transaction method", "-0.5", "In-person method"),
         "International": (user["is_international"] == "Yes", "+0.5", "International transaction", "-0.5", "Domestic transaction"),
@@ -376,7 +377,7 @@ if st.session_state.submitted:
         cbar_kws={"label": "Fraud Likelihood Score"},
         ax=ax
     )
-    plt.title("Anomaly Heatmap", fontsize=14)
+    plt.title("Adjusted Anomaly Heatmap (Fraud Risk Based)", fontsize=14)
     st.pyplot(fig)
 
     st.markdown("### 📋 Heatmap Summary Explanation:")
