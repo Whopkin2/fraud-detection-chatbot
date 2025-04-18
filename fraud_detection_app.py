@@ -384,7 +384,18 @@ if st.session_state.submitted:
     for line in summary_lines:
         st.markdown(line)
 
-# ✅ EMAIL BUTTON (Paste this below the heatmap summary block)
+   # 🔍 DEBUG INFO TO SEE WHY IT'S NOT SHOWING
+    st.markdown(f"""
+    ---
+    ### 🚨 Debug: Email Alert Trigger Check
+    - Result: `{d['result']}`
+    - Confidence: `{d['confidence_score']}`
+    - Email: `{d.get('email')}`
+    - Email Sent Already? `{st.session_state.email_sent}`
+    ---
+    """)
+
+    # ✅ EMAIL BUTTON
     if (
         d['result'] == "Fraudulent"
         and d['confidence_score'] >= 50
@@ -392,7 +403,6 @@ if st.session_state.submitted:
         and d.get('email').strip() != ""
         and not st.session_state.email_sent
     ):
-        st.markdown("---")
         st.markdown("### 📧 Email Alert")
         st.markdown(f"**Ready to alert `{d['email']}` about the flagged transaction.**")
 
@@ -412,7 +422,7 @@ Recommended Actions:
 - Verify this transaction
 - Contact your bank if unauthorized
 - Monitor account activity immediately."""
-        )
+            )
 
             if email_sent:
                 st.success("✅ Alert sent to account owner and admin.")
