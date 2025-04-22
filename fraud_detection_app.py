@@ -326,9 +326,10 @@ if st.session_state.submitted:
     st.markdown(f"📌 **Summary**: {summary}")
     st.markdown("<h3 style='font-family: Arial;'>🧠 Explanation:</h3>", unsafe_allow_html=True)
     st.markdown(
-        f"<div style='font-family: Arial; font-size: 16px; line-height: 1.6;'>{d.get('explanation', 'Explanation not available.')}</div>",
-        unsafe_allow_html=True
-    )
+        st.markdown(
+            f"<pre style='font-family: Arial; font-size: 16px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; border: none; background: none;'>{d.get('explanation', 'Explanation not available.')}</pre>",
+            unsafe_allow_html=True
+        )
 
     st.markdown("<h3 style='font-family: Arial;'>🔍 Feature Highlights Contributing to Detection:</h3>", unsafe_allow_html=True)
     for insight in d.get('anomaly_insights', []):
