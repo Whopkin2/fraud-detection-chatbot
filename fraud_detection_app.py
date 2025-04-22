@@ -293,10 +293,10 @@ if submitted:
 
 if st.session_state.submitted:
     d = st.session_state.result_data
-    st.markdown(f"### Prediction: **{d['result']}**")
-    st.markdown(f"**Confidence Level:** {d['confidence_score']}% Confident")
+    st.markdown(f"<h3 style='font-family: Arial;'>Prediction: <b>{d['result']}</b></h3>", unsafe_allow_html=True)
+    st.markdown(f"<p style='font-family: Arial;'><b>Confidence Level:</b> {d['confidence_score']}% Confident</p>", unsafe_allow_html=True)
 
-    st.markdown("### 🧠 Behavioral Risk Rating Breakdown")
+    st.markdown("<h3 style='font-family: Arial;'>🧠 Behavioral Risk Rating Breakdown</h3>", unsafe_allow_html=True)
     score = d['behavior_rating']
     user = d['user_input']
     score_factors = []
@@ -324,17 +324,17 @@ if st.session_state.submitted:
         summary = "Low behavioral risk detected. Transaction appears typical."
 
     st.markdown(f"📌 **Summary**: {summary}")
-    st.markdown("### 🧠 Explanation:")
+    st.markdown("<h3 style='font-family: Arial;'>🧠 Explanation:</h3>", unsafe_allow_html=True)
     st.markdown(
         f"<div style='font-family: Arial; font-size: 16px; line-height: 1.6;'>{d.get('explanation', 'Explanation not available.')}</div>",
         unsafe_allow_html=True
     )
 
-    st.markdown("### 🔍 Feature Highlights Contributing to Detection:")
+    st.markdown("<h3 style='font-family: Arial;'>🔍 Feature Highlights Contributing to Detection:</h3>", unsafe_allow_html=True)
     for insight in d.get('anomaly_insights', []):
         st.markdown(insight)
 
-    st.markdown("### 📊 Adjusted Anomaly Heatmap (Fraud Risk Based):")
+    st.markdown("<h3 style='font-family: Arial;'>📊 Adjusted Anomaly Heatmap (Fraud Risk Based):</h3>", unsafe_allow_html=True)
 
     # Behavioral risk logic mapping
     risk_logic = {
@@ -380,7 +380,7 @@ if st.session_state.submitted:
     plt.title("Adjusted Anomaly Heatmap (Fraud Risk Based)", fontsize=14)
     st.pyplot(fig)
 
-    st.markdown("### 📋 Heatmap Summary Explanation:")
+    st.markdown("<h3 style='font-family: Arial;'>📋 Heatmap Summary Explanation:</h3>", unsafe_allow_html=True)
     for line in summary_lines:
         st.markdown(line)
 
@@ -397,7 +397,7 @@ if st.session_state.submitted:
         and d.get('email').strip() != ""
         and not st.session_state.email_sent
     ):
-        st.markdown("### 📧 Email Alert")
+        st.markdown("<h3 style='font-family: Arial;'>📧 Email Alert</h3>", unsafe_allow_html=True)
         st.markdown(f"**Ready to alert `{d['email']}` about the flagged transaction.**")
 
         if st.button("📧 Send Fraud Alert Email"):
