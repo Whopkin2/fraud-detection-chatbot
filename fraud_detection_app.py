@@ -103,15 +103,15 @@ def calculate_confidence_from_rating(score):
 
 def compute_behavioral_risk_score(user):
     score_factors = [
-        ("Account Age", +1.0 if user["account_age_days"] < 90 else -1.0),
-        ("Login Attempts", +0.75 if user["login_attempts"] > 3 else -0.75),
-        ("Transaction Amount", +1.0 if user["transaction_amount"] > 10000 else -1.0),
-        ("Time of Day", +0.5 if user["is_late_night"] == 1 else -0.5),
-        ("Method", +0.25 if user["transaction_method"] in ["Online", "Mobile", "Wire"] else -0.25),
-        ("International", +0.75 if user["is_international"] == "Yes" else -0.75),
-        ("Negative Balance", +0.25 if user["is_negative_balance_after"] == 1 else -0.25),
-        ("Short Duration", +0.25 if user["transaction_duration"] <= 2 else -0.25),
-        ("Young Age", +0.25 if user["customer_age"] < 24 else -0.25)
+    ("Account Age", 1.0, user["account_age_days"] < 90, "Account is new", "Account is established"),
+    ("Login Attempts", 0.75, user["login_attempts"] > 3, "Too many login attempts", "Login count is normal"),
+    ("Transaction Amount", 1.0, user["transaction_amount"] > 10000, "Large transaction amount", "Amount is modest"),
+    ("Time of Day", 0.5, user["is_late_night"] == 1, "Suspicious late-night timing", "Normal hours"),
+    ("Method", 0.25, user["transaction_method"] in ["Online", "Mobile", "Wire"], "Remote transaction method", "In-person method"),
+    ("International", 0.75, user["is_international"] == "Yes", "International transaction", "Domestic transaction"),
+    ("Negative Balance", 0.25, user["is_negative_balance_after"] == 1, "Ends in negative balance", "Balance is sufficient"),
+    ("Short Duration", 0.25, user["transaction_duration"] <= 2, "Suspiciously fast transaction", "Normal duration"),
+    ("Young Age", 0.25, user["customer_age"] < 24, "Very young customer", "Customer age is mature")
     ]
     total_score = sum(score for _, score in score_factors)
     return max(0, min(5, round(total_score, 2)))
@@ -209,17 +209,17 @@ if submitted:
     input_df = input_df.astype(float).reindex(columns=X.columns, fill_value=0)
 
     # 1. Compute behavioral risk rating
-    score_factors = []
-    score_factors.append(("Account Age", +1.0 if user_input["account_age_days"] < 90 else -1.0, "Account is new" if user_input["account_age_days"] < 90 else "Account is established"))
-    score_factors.append(("Login Attempts", +0.75 if user_input["login_attempts"] > 3 else -0.75, "Too many login attempts" if user_input["login_attempts"] > 3 else "Login count is normal"))
-    score_factors.append(("Transaction Amount", +1.0 if user_input["transaction_amount"] > 10000 else -1.0, "Large transaction amount" if user_input["transaction_amount"] > 10000 else "Amount is modest"))
-    score_factors.append(("Time of Day", +0.5 if user_input["is_late_night"] == 1 else -0.5, "Suspicious late-night timing" if user_input["is_late_night"] == 1 else "Normal hours"))
-    score_factors.append(("Method", +0.25 if user_input["transaction_method"] in ["Online", "Mobile", "Wire"] else -0.25, "Remote transaction method" if user_input["transaction_method"] in ["Online", "Mobile", "Wire"] else "In-person method"))
-    score_factors.append(("International", +0.75 if user_input["is_international"] == "Yes" else -0.75, "International transaction" if user_input["is_international"] == "Yes" else "Domestic transaction"))
-    score_factors.append(("Negative Balance", +0.25 if user_input["is_negative_balance_after"] == 1 else -0.25, "Ends in negative balance" if user_input["is_negative_balance_after"] == 1 else "Balance is sufficient"))
-    score_factors.append(("Short Duration", +0.25 if user_input["transaction_duration"] <= 2 else -0.25, "Suspiciously fast transaction" if user_input["transaction_duration"] <= 2 else "Normal duration"))
-    score_factors.append(("Young Age", +0.25 if user_input["customer_age"] < 24 else -0.25, "Very young customer" if user_input["customer_age"] < 24 else "Customer age is mature"))
-
+    score_factors = [
+        score_factors.append(("Account Age", +1.0 if user_input["account_age_days"] < 90 else -1.0, "Account is new" if user_input["account_age_days"] < 90 else "Account is established"))
+        score_factors.append(("Login Attempts", +0.75 if user_input["login_attempts"] > 3 else -0.75, "Too many login attempts" if user_input["login_attempts"] > 3 else "Login count is normal"))
+        score_factors.append(("Transaction Amount", +1.0 if user_input["transaction_amount"] > 10000 else -1.0, "Large transaction amount" if user_input["transaction_amount"] > 10000 else "Amount is modest"))
+        score_factors.append(("Time of Day", +0.5 if user_input["is_late_night"] == 1 else -0.5, "Suspicious late-night timing" if user_input["is_late_night"] == 1 else "Normal hours"))
+        score_factors.append(("Method", +0.25 if user_input["transaction_method"] in ["Online", "Mobile", "Wire"] else -0.25, "Remote transaction method" if user_input["transaction_method"] in ["Online", "Mobile", "Wire"] else "In-person method"))
+        score_factors.append(("International", +0.75 if user_input["is_international"] == "Yes" else -0.75, "International transaction" if user_input["is_international"] == "Yes" else "Domestic transaction"))
+        score_factors.append(("Negative Balance", +0.25 if user_input["is_negative_balance_after"] == 1 else -0.25, "Ends in negative balance" if user_input["is_negative_balance_after"] == 1 else "Balance is sufficient"))
+        score_factors.append(("Short Duration", +0.25 if user_input["transaction_duration"] <= 2 else -0.25, "Suspiciously fast transaction" if user_input["transaction_duration"] <= 2 else "Normal duration"))
+        score_factors.append(("Young Age", +0.25 if user_input["customer_age"] < 24 else -0.25, "Very young customer" if user_input["customer_age"] < 24 else "Customer age is mature"))
+    ]
     # Compute new rating directly from the same scoring logic
     rating = max(0, min(5, round(sum(impact for _, impact, _ in score_factors), 2)))
 
@@ -274,28 +274,33 @@ if st.session_state.submitted:
     st.markdown(f"<h3 style='font-family: Arial;'>Prediction: <b>{d['result']}</b></h3>", unsafe_allow_html=True)
     st.markdown(f"<p style='font-family: Arial;'><b>Confidence Level:</b> {d['confidence_score']}% Confident</p>", unsafe_allow_html=True)
 
-    st.markdown("<h3 style='font-family: Arial;'>🧠 Behavioral Risk Rating Breakdown</h3>", unsafe_allow_html=True)
-    user = d['user_input']
+    st.markdown("<h3 style='font-family: Arial;'>\U0001f9e0 Behavioral Risk Rating Breakdown</h3>", unsafe_allow_html=True)
+    user = st.session_state.result_data['user_input']
 
-    # Unified score breakdown logic (used for both UI and scoring)
     score_factors = [
-        ("Account Age", +1.0 if user["account_age_days"] < 90 else -1.0, "Account is new" if user["account_age_days"] < 90 else "Account is established"),
-        ("Login Attempts", +0.75 if user["login_attempts"] > 3 else -0.75, "Too many login attempts" if user["login_attempts"] > 3 else "Login count is normal"),
-        ("Transaction Amount", +1.0 if user["transaction_amount"] > 10000 else -1.0, "Large transaction amount" if user["transaction_amount"] > 10000 else "Amount is modest"),
-        ("Time of Day", +0.5 if user["is_late_night"] == 1 else -0.5, "Suspicious late-night timing" if user["is_late_night"] == 1 else "Normal hours"),
-        ("Method", +0.25 if user["transaction_method"] in ["Online", "Mobile", "Wire"] else -0.25, "Remote transaction method" if user["transaction_method"] in ["Online", "Mobile", "Wire"] else "In-person method"),
-        ("International", +0.75 if user["is_international"] == "Yes" else -0.75, "International transaction" if user["is_international"] == "Yes" else "Domestic transaction"),
-        ("Negative Balance", +0.25 if user["is_negative_balance_after"] == 1 else -0.25, "Ends in negative balance" if user["is_negative_balance_after"] == 1 else "Balance is sufficient"),
-        ("Short Duration", +0.25 if user["transaction_duration"] <= 2 else -0.25, "Suspiciously fast transaction" if user["transaction_duration"] <= 2 else "Normal duration"),
-        ("Young Age", +0.25 if user["customer_age"] < 24 else -0.25, "Very young customer" if user["customer_age"] < 24 else "Customer age is mature")
+        ("Account Age", 1.0, user["account_age_days"] < 90, "Account is new", "Account is established"),
+        ("Login Attempts", 0.75, user["login_attempts"] > 3, "Too many login attempts", "Login count is normal"),
+        ("Transaction Amount", 1.0, user["transaction_amount"] > 10000, "Large transaction amount", "Amount is modest"),
+        ("Time of Day", 0.5, user["is_late_night"] == 1, "Suspicious late-night timing", "Normal hours"),
+        ("Method", 0.25, user["transaction_method"] in ["Online", "Mobile", "Wire"], "Remote transaction method", "In-person method"),
+        ("International", 0.75, user["is_international"] == "Yes", "International transaction", "Domestic transaction"),
+        ("Negative Balance", 0.25, user["is_negative_balance_after"] == 1, "Ends in negative balance", "Balance is sufficient"),
+        ("Short Duration", 0.25, user["transaction_duration"] <= 2, "Suspiciously fast transaction", "Normal duration"),
+        ("Young Age", 0.25, user["customer_age"] < 24, "Very young customer", "Customer age is mature")
     ]
 
-    rating = max(0, min(5, round(sum(score for _, score, _ in score_factors), 2)))
-
-    st.markdown(f"**Total Behavioral Risk Rating: {rating} / 5**")
-    for factor, impact, reason in score_factors:
+    rating = 0
+    for factor, weight, condition, pos_desc, neg_desc in score_factors:
+        impact = weight if condition else -weight
+        rating += impact
         sign = "+" if impact > 0 else "–"
-        st.markdown(f"- **{factor}**: {sign}{abs(impact)} → _{reason}_")
+        reason = pos_desc if condition else neg_desc
+        st.markdown(f"- **{factor}**: {sign}{abs(weight)} → _{reason}_")
+
+    rating = max(0, min(5, round(rating, 2)))
+    st.markdown(f"**Total Behavioral Risk Rating: {rating} / 5**")
+
+    st.session_state.result_data['behavior_rating'] = rating
 
     if rating >= 4.0:
         summary = "This transaction shows multiple high-risk traits. Please investigate urgently."
