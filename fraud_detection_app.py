@@ -323,7 +323,7 @@ if st.session_state.submitted:
     for insight in d.get('anomaly_insights', []):
         st.markdown(insight)
 
-    st.markdown("<h3 style='font-family: Arial;'>📊 Adjusted Anomaly Heatmap (Fraud Risk Based):</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='font-family: Arial;'>📊 Anomaly Heatmap:</h3>", unsafe_allow_html=True)
 
     risk_logic = {
         "Account Age": (user["account_age_days"] < 90, "+1.0", "Account is new", "-1.0", "Account is established"),
