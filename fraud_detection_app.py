@@ -104,14 +104,14 @@ def calculate_confidence_from_rating(score):
 def compute_behavioral_risk_score(user):
     score_factors = [
         ("Account Age", +1.0 if user["account_age_days"] < 90 else -1.0),
-        ("Login Attempts", +0.5 if user["login_attempts"] > 3 else -0.5),
+        ("Login Attempts", +0.75 if user["login_attempts"] > 3 else -0.75),
         ("Transaction Amount", +1.0 if user["transaction_amount"] > 10000 else -1.0),
         ("Time of Day", +0.5 if user["is_late_night"] == 1 else -0.5),
-        ("Method", +0.5 if user["transaction_method"] in ["Online", "Mobile", "Wire"] else -0.5),
-        ("International", +0.5 if user["is_international"] == "Yes" else -0.5),
-        ("Negative Balance", +0.5 if user["is_negative_balance_after"] == 1 else -0.5),
-        ("Short Duration", +0.5 if user["transaction_duration"] <= 2 else -0.5),
-        ("Young Age", +0.5 if user["customer_age"] < 24 else -0.5)
+        ("Method", +0.25 if user["transaction_method"] in ["Online", "Mobile", "Wire"] else -0.25),
+        ("International", +0.75 if user["is_international"] == "Yes" else -0.75),
+        ("Negative Balance", +0.25 if user["is_negative_balance_after"] == 1 else -0.25),
+        ("Short Duration", +0.25 if user["transaction_duration"] <= 2 else -0.25),
+        ("Young Age", +0.25 if user["customer_age"] < 24 else -0.25)
     ]
     total_score = sum(score for _, score in score_factors)
     return max(0, min(5, round(total_score, 2)))
@@ -211,14 +211,14 @@ if submitted:
     # 1. Compute behavioral risk rating
     score_factors = []
     score_factors.append(("Account Age", +1.0 if user_input["account_age_days"] < 90 else -1.0, "Account is new" if user_input["account_age_days"] < 90 else "Account is established"))
-    score_factors.append(("Login Attempts", +0.5 if user_input["login_attempts"] > 3 else -0.5, "Too many login attempts" if user_input["login_attempts"] > 3 else "Login count is normal"))
+    score_factors.append(("Login Attempts", +0.75 if user_input["login_attempts"] > 3 else -0.75, "Too many login attempts" if user_input["login_attempts"] > 3 else "Login count is normal"))
     score_factors.append(("Transaction Amount", +1.0 if user_input["transaction_amount"] > 10000 else -1.0, "Large transaction amount" if user_input["transaction_amount"] > 10000 else "Amount is modest"))
     score_factors.append(("Time of Day", +0.5 if user_input["is_late_night"] == 1 else -0.5, "Suspicious late-night timing" if user_input["is_late_night"] == 1 else "Normal hours"))
-    score_factors.append(("Method", +0.5 if user_input["transaction_method"] in ["Online", "Mobile", "Wire"] else -0.5, "Remote transaction method" if user_input["transaction_method"] in ["Online", "Mobile", "Wire"] else "In-person method"))
-    score_factors.append(("International", +0.5 if user_input["is_international"] == "Yes" else -0.5, "International transaction" if user_input["is_international"] == "Yes" else "Domestic transaction"))
-    score_factors.append(("Negative Balance", +0.5 if user_input["is_negative_balance_after"] == 1 else -0.5, "Ends in negative balance" if user_input["is_negative_balance_after"] == 1 else "Balance is sufficient"))
-    score_factors.append(("Short Duration", +0.5 if user_input["transaction_duration"] <= 2 else -0.5, "Suspiciously fast transaction" if user_input["transaction_duration"] <= 2 else "Normal duration"))
-    score_factors.append(("Young Age", +0.5 if user_input["customer_age"] < 24 else -0.5, "Very young customer" if user_input["customer_age"] < 24 else "Customer age is mature"))
+    score_factors.append(("Method", +0.25 if user_input["transaction_method"] in ["Online", "Mobile", "Wire"] else -0.25, "Remote transaction method" if user_input["transaction_method"] in ["Online", "Mobile", "Wire"] else "In-person method"))
+    score_factors.append(("International", +0.75 if user_input["is_international"] == "Yes" else -0.75, "International transaction" if user_input["is_international"] == "Yes" else "Domestic transaction"))
+    score_factors.append(("Negative Balance", +0.25 if user_input["is_negative_balance_after"] == 1 else -0.25, "Ends in negative balance" if user_input["is_negative_balance_after"] == 1 else "Balance is sufficient"))
+    score_factors.append(("Short Duration", +0.25 if user_input["transaction_duration"] <= 2 else -0.25, "Suspiciously fast transaction" if user_input["transaction_duration"] <= 2 else "Normal duration"))
+    score_factors.append(("Young Age", +0.25 if user_input["customer_age"] < 24 else -0.25, "Very young customer" if user_input["customer_age"] < 24 else "Customer age is mature"))
 
     # Compute new rating directly from the same scoring logic
     rating = max(0, min(5, round(sum(impact for _, impact, _ in score_factors), 2)))
@@ -280,14 +280,14 @@ if st.session_state.submitted:
     # Unified score breakdown logic (used for both UI and scoring)
     score_factors = [
         ("Account Age", +1.0 if user["account_age_days"] < 90 else -1.0, "Account is new" if user["account_age_days"] < 90 else "Account is established"),
-        ("Login Attempts", +0.5 if user["login_attempts"] > 3 else -0.5, "Too many login attempts" if user["login_attempts"] > 3 else "Login count is normal"),
+        ("Login Attempts", +0.75 if user["login_attempts"] > 3 else -0.75, "Too many login attempts" if user["login_attempts"] > 3 else "Login count is normal"),
         ("Transaction Amount", +1.0 if user["transaction_amount"] > 10000 else -1.0, "Large transaction amount" if user["transaction_amount"] > 10000 else "Amount is modest"),
         ("Time of Day", +0.5 if user["is_late_night"] == 1 else -0.5, "Suspicious late-night timing" if user["is_late_night"] == 1 else "Normal hours"),
-        ("Method", +0.5 if user["transaction_method"] in ["Online", "Mobile", "Wire"] else -0.5, "Remote transaction method" if user["transaction_method"] in ["Online", "Mobile", "Wire"] else "In-person method"),
-        ("International", +0.5 if user["is_international"] == "Yes" else -0.5, "International transaction" if user["is_international"] == "Yes" else "Domestic transaction"),
-        ("Negative Balance", +0.5 if user["is_negative_balance_after"] == 1 else -0.5, "Ends in negative balance" if user["is_negative_balance_after"] == 1 else "Balance is sufficient"),
-        ("Short Duration", +0.5 if user["transaction_duration"] <= 2 else -0.5, "Suspiciously fast transaction" if user["transaction_duration"] <= 2 else "Normal duration"),
-        ("Young Age", +0.5 if user["customer_age"] < 24 else -0.5, "Very young customer" if user["customer_age"] < 24 else "Customer age is mature")
+        ("Method", +0.25 if user["transaction_method"] in ["Online", "Mobile", "Wire"] else -0.25, "Remote transaction method" if user["transaction_method"] in ["Online", "Mobile", "Wire"] else "In-person method"),
+        ("International", +0.75 if user["is_international"] == "Yes" else -0.75, "International transaction" if user["is_international"] == "Yes" else "Domestic transaction"),
+        ("Negative Balance", +0.25 if user["is_negative_balance_after"] == 1 else -0.25, "Ends in negative balance" if user["is_negative_balance_after"] == 1 else "Balance is sufficient"),
+        ("Short Duration", +0.25 if user["transaction_duration"] <= 2 else -0.25, "Suspiciously fast transaction" if user["transaction_duration"] <= 2 else "Normal duration"),
+        ("Young Age", +0.25 if user["customer_age"] < 24 else -0.25, "Very young customer" if user["customer_age"] < 24 else "Customer age is mature")
     ]
 
     rating = max(0, min(5, round(sum(score for _, score, _ in score_factors), 2)))
@@ -319,14 +319,14 @@ if st.session_state.submitted:
 
     risk_logic = {
         "Account Age": (user["account_age_days"] < 90, "+1.0", "Account is new", "-1.0", "Account is established"),
-        "Login Attempts": (user["login_attempts"] > 3, "+0.5", "Too many login attempts", "-0.5", "Login count is normal"),
+        "Login Attempts": (user["login_attempts"] > 3, "+0.75", "Too many login attempts", "-0.75", "Login count is normal"),
         "Transaction Amount": (user["transaction_amount"] > 10000, "+1.0", "Large transaction amount", "-1.0", "Amount is modest"),
         "Time of Day": (user["is_late_night"] == 1, "+0.5", "Suspicious late-night timing", "-0.5", "Normal hours"),
-        "Method": (user["transaction_method"] in ["Online", "Mobile", "Wire"], "+0.5", "Remote transaction method", "-0.5", "In-person method"),
-        "International": (user["is_international"] == "Yes", "+0.5", "International transaction", "-0.5", "Domestic transaction"),
-        "Negative Balance": (user["is_negative_balance_after"] == 1, "+0.5", "Ends in negative balance", "-0.5", "Balance is sufficient"),
-        "Short Duration": (user["transaction_duration"] <= 2, "+0.5", "Suspiciously fast transaction", "-0.5", "Normal duration"),
-        "Young Age": (user["customer_age"] < 24, "+0.5", "Very young customer", "-0.5", "Customer age is mature")
+        "Method": (user["transaction_method"] in ["Online", "Mobile", "Wire"], "+0.25", "Remote transaction method", "-0.25", "In-person method"),
+        "International": (user["is_international"] == "Yes", "+0.75", "International transaction", "-0.75", "Domestic transaction"),
+        "Negative Balance": (user["is_negative_balance_after"] == 1, "+0.25", "Ends in negative balance", "-0.25", "Balance is sufficient"),
+        "Short Duration": (user["transaction_duration"] <= 2, "+0.25", "Suspiciously fast transaction", "-0.25", "Normal duration"),
+        "Young Age": (user["customer_age"] < 24, "+0.25", "Very young customer", "-0.25", "Customer age is mature")
     }
 
     heatmap_data = []
