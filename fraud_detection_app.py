@@ -342,7 +342,7 @@ if st.session_state.submitted:
         score = float(pos_score.strip('+')) if condition else float(neg_score.strip('-'))
         label = pos_score if condition else neg_score
         desc = pos_desc if condition else neg_desc
-        status = "🔴 High Risk" if score == 3.0 else "🔵 Low Risk"
+        status = "🔴 High Risk" if score > 3.0 else "🔵 Low Risk"
 
         heatmap_data.append((feature, score, label))
         annotations.append(desc)
@@ -357,7 +357,7 @@ if st.session_state.submitted:
         annot=heatmap_df[["Label"]],
         fmt="",
         cmap="RdBu_r",
-        center=2.0,
+        center=0,
         linewidths=0.5,
         cbar_kws={"label": "Fraud Likelihood Score"},
         ax=ax
