@@ -309,34 +309,32 @@ if st.session_state.submitted:
     st.markdown(f"<p style='font-family: Arial;'><b>Confidence Level:</b> {d['confidence_score']}% Confident</p>", unsafe_allow_html=True)
 
     st.markdown("<h3 style='font-family: Arial;'>🧠 Behavioral Risk Rating Breakdown</h3>", unsafe_allow_html=True)
-    score = d['behavior_rating']
     user = d['user_input']
-    score_factors = []
 
-    score_factors.append(("Young Age", +0.5 if user["customer_age"] < 24 else -0.5, "Very young customer" if user["customer_age"] < 24 else "Customer age is mature"))
+    # Unified scoring logic
+    score_factors = [
+        ("Account Age", +1.0 if user["account_age_days"] < 90 else -1.0, "Account is new" if user["account_age_days"] < 90 else "Account is established"),
+        ("Login Attempts", +0.5 if user["login_attempts"] > 3 else -0.5, "Too many login attempts" if user["login_attempts"] > 3 else "Login count is normal"),
+        ("Transaction Amount", +1.0 if user["transaction_amount"] > 10000 else -1.0, "Large transaction amount" if user["transaction_amount"] > 10000 else "Amount is modest"),
+        ("Time of Day", +0.5 if user["is_late_night"] == 1 else -0.5, "Suspicious late-night timing" if user["is_late_night"] == 1 else "Normal hours"),
+        ("Method", +0.5 if user["transaction_method"] in ["Online", "Mobile", "Wire"] else -0.5, "Remote transaction method" if user["transaction_method"] in ["Online", "Mobile", "Wire"] else "In-person method"),
+        ("International", +0.5 if user["is_international"] == "Yes" else -0.5, "International transaction" if user["is_international"] == "Yes" else "Domestic transaction"),
+        ("Negative Balance", +0.5 if user["is_negative_balance_after"] == 1 else -0.5, "Ends in negative balance" if user["is_negative_balance_after"] == 1 else "Balance is sufficient"),
+        ("Short Duration", +0.5 if user["transaction_duration"] <= 2 else -0.5, "Suspiciously fast transaction" if user["transaction_duration"] <= 2 else "Normal duration"),
+        ("Young Age", +0.5 if user["customer_age"] < 24 else -0.5, "Very young customer" if user["customer_age"] < 24 else "Customer age is mature")
+    ]
 
-    # 🔁 FIXED: Calculate actual score from above factors
-    real_score_total = sum(impact for _, impact, _ in score_factors)
-    real_score_total = max(0, min(5, round(real_score_total, 2)))
+    # True score (matches prediction logic)
+    rating = max(0, min(5, round(sum(impact for _, impact, _ in score_factors), 2)))
 
-    score_factors.append(("Account Age", +1.0 if user["account_age_days"] < 90 else -1.0, "Account is new" if user["account_age_days"] < 90 else "Account is established"))
-    score_factors.append(("Login Attempts", +0.5 if user["login_attempts"] > 3 else -0.5, "Too many login attempts" if user["login_attempts"] > 3 else "Login count is normal"))
-    score_factors.append(("Transaction Amount", +1.0 if user["transaction_amount"] > 10000 else -1.0, "Large transaction amount" if user["transaction_amount"] > 10000 else "Amount is modest"))
-    score_factors.append(("Time of Day", +0.5 if user["is_late_night"] == 1 else -0.5, "Suspicious late-night timing" if user["is_late_night"] == 1 else "Normal hours"))
-    score_factors.append(("Method", +0.5 if user["transaction_method"] in ["Online", "Mobile", "Wire"] else -0.5, "Remote transaction method" if user["transaction_method"] in ["Online", "Mobile", "Wire"] else "In-person method"))
-    score_factors.append(("International", +0.5 if user["is_international"] == "Yes" else -0.5, "International transaction" if user["is_international"] == "Yes" else "Domestic transaction"))
-    score_factors.append(("Negative Balance", +0.5 if user["is_negative_balance_after"] == 1 else -0.5, "Ends in negative balance" if user["is_negative_balance_after"] == 1 else "Balance is sufficient"))
-    score_factors.append(("Short Duration", +0.5 if user["transaction_duration"] <= 2 else -0.5, "Suspiciously fast transaction" if user["transaction_duration"] <= 2 else "Normal duration"))
-    score_factors.append(("Young Age", +0.5 if user["customer_age"] < 24 else -0.5, "Very young customer" if user["customer_age"] < 24 else "Customer age is mature"))
-
-    st.markdown(f"**Total Behavioral Risk Rating: {real_score_total} / 5**")
+    st.markdown(f"**Total Behavioral Risk Rating: {rating} / 5**")
     for factor, impact, reason in score_factors:
         sign = "+" if impact > 0 else "–"
         st.markdown(f"- **{factor}**: {sign}{abs(impact)} → _{reason}_")
 
-    if score >= 4.0:
+    if rating >= 4.0:
         summary = "This transaction shows multiple high-risk traits. Please investigate urgently."
-    elif score >= 2.5:
+    elif rating >= 2.5:
         summary = "There are moderate risk indicators present. Further review is recommended."
     else:
         summary = "Low behavioral risk detected. Transaction appears typical."
@@ -344,9 +342,9 @@ if st.session_state.submitted:
     st.markdown(f"📌 **Summary**: {summary}")
     st.markdown("<h3 style='font-family: Arial;'>🧠 Explanation:</h3>", unsafe_allow_html=True)
     st.markdown(
-            f"<pre style='font-family: Arial; font-size: 16px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; border: none; background: none;'>{d.get('explanation', 'Explanation not available.')}</pre>",
-            unsafe_allow_html=True
-        )
+        f"<pre style='font-family: Arial; font-size: 16px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; border: none; background: none;'>{d.get('explanation', 'Explanation not available.')}</pre>",
+        unsafe_allow_html=True
+    )
 
     st.markdown("<h3 style='font-family: Arial;'>🔍 Feature Highlights Contributing to Detection:</h3>", unsafe_allow_html=True)
     for insight in d.get('anomaly_insights', []):
@@ -354,7 +352,6 @@ if st.session_state.submitted:
 
     st.markdown("<h3 style='font-family: Arial;'>📊 Adjusted Anomaly Heatmap (Fraud Risk Based):</h3>", unsafe_allow_html=True)
 
-    # Behavioral risk logic mapping
     risk_logic = {
         "Account Age": (user["account_age_days"] < 90, "+1.0", "Account is new", "-1.0", "Account is established"),
         "Login Attempts": (user["login_attempts"] > 3, "+0.5", "Too many login attempts", "-0.5", "Login count is normal"),
@@ -372,12 +369,12 @@ if st.session_state.submitted:
     summary_lines = []
 
     for feature, (condition, pos_score, pos_desc, neg_score, neg_desc) in risk_logic.items():
-        score = 3.0 if "+" in pos_score and condition else 1.0
+        visual_score = 3.0 if condition else 1.0
         label = pos_score if condition else neg_score
         desc = pos_desc if condition else neg_desc
-        status = "🔴 High Risk" if score == 3.0 else "🔵 Low Risk"
+        status = "🔴 High Risk" if visual_score == 3.0 else "🔵 Low Risk"
 
-        heatmap_data.append((feature, score, label))
+        heatmap_data.append((feature, visual_score, label))
         annotations.append(desc)
         summary_lines.append(f"- **{feature}** → {desc} → **{label}** ({status})")
 
@@ -402,12 +399,10 @@ if st.session_state.submitted:
     for line in summary_lines:
         st.markdown(line)
 
-       # 🔁 Optional reset button to re-show the email button for dev testing
     if st.button("🔄 Reset Email Sent Flag (Dev Only)"):
         st.session_state.email_sent = False
         st.success("✅ Email sent flag has been reset. Email button will now reappear.")
 
-      # 📧 EMAIL ALERT BUTTON
     if (
         d['result'] == "Fraudulent"
         and d['confidence_score'] >= 50
@@ -425,7 +420,7 @@ if st.session_state.submitted:
                 subject="🚨 FRAUD ALERT – Suspicious Transaction Detected",
                 message=f"""A transaction was flagged with a **confidence level of {d['confidence_score']}%**.
 
-Behavioral Risk Rating: {d['behavior_rating']} / 5
+Behavioral Risk Rating: {rating} / 5
 
 Transaction Details:
 {tx}
