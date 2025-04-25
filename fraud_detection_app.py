@@ -320,7 +320,7 @@ if st.session_state.submitted:
     risk_logic = {
         "Account Age": (user["account_age_days"] < 90, "+1.0", "Account is new", "-1.0", "Account is established"),
         "Login Attempts": (user["login_attempts"] > 3, "+0.5", "Too many login attempts", "-0.5", "Login count is normal"),
-        "Transaction Amount": (user["transaction_amount"] > 5000, "+1.0", "Large transaction amount", "-1.0", "Amount is modest"),
+        "Transaction Amount": (user["transaction_amount"] > 10000, "+1.0", "Large transaction amount", "-1.0", "Amount is modest"),
         "Time of Day": (user["is_late_night"] == 1, "+0.5", "Suspicious late-night timing", "-0.5", "Normal hours"),
         "Method": (user["transaction_method"] in ["Online", "Mobile", "Wire"], "+0.5", "Remote transaction method", "-0.5", "In-person method"),
         "International": (user["is_international"] == "Yes", "+0.5", "International transaction", "-0.5", "Domestic transaction"),
@@ -334,7 +334,7 @@ if st.session_state.submitted:
     summary_lines = []
 
     for feature, (condition, pos_score, pos_desc, neg_score, neg_desc) in risk_logic.items():
-        score = 3.0 if condition else 1.0
+        score = float(pos_score.strip('+')) if condition else float(neg_score.strip('-'))
         label = pos_score if condition else neg_score
         desc = pos_desc if condition else neg_desc
         status = "🔴 High Risk" if score == 3.0 else "🔵 Low Risk"
