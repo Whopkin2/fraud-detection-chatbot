@@ -102,19 +102,25 @@ def calculate_confidence_from_rating(score):
     return round(confidence, 2)
 
 def compute_behavioral_risk_score(user):
-    score_factors = []
-    ("Account Age", 1.0, user["account_age_days"] < 90, "Account is new", "Account is established"),
-    ("Login Attempts", 0.75, user["login_attempts"] > 3, "Too many login attempts", "Login count is normal"),
-    ("Transaction Amount", 1.0, user["transaction_amount"] > 10000, "Large transaction amount", "Amount is modest"),
-    ("Time of Day", 0.5, user["is_late_night"] == 1, "Suspicious late-night timing", "Normal hours"),
-    ("Method", 0.25, user["transaction_method"] in ["Online", "Mobile", "Wire"], "Remote transaction method", "In-person method"),
-    ("International", 0.75, user["is_international"] == "Yes", "International transaction", "Domestic transaction"),
-    ("Negative Balance", 0.25, user["is_negative_balance_after"] == 1, "Ends in negative balance", "Balance is sufficient"),
-    ("Short Duration", 0.25, user["transaction_duration"] <= 2, "Suspiciously fast transaction", "Normal duration"),
-    ("Young Age", 0.25, user["customer_age"] < 24, "Very young customer", "Customer age is mature")
-    
-    total_score = sum(score for _, score in score_factors)
-    return max(0, min(5, round(total_score, 2)))
+    score_factors = [
+        ("Account Age", 1.0, user["account_age_days"] < 90, "Account is new", "Account is established"),
+        ("Login Attempts", 0.75, user["login_attempts"] > 3, "Too many login attempts", "Login count is normal"),
+        ("Transaction Amount", 1.0, user["transaction_amount"] > 10000, "Large transaction amount", "Amount is modest"),
+        ("Time of Day", 0.5, user["is_late_night"] == 1, "Suspicious late-night timing", "Normal hours"),
+        ("Method", 0.25, user["transaction_method"] in ["Online", "Mobile", "Wire"], "Remote transaction method", "In-person method"),
+        ("International", 0.75, user["is_international"] == "Yes", "International transaction", "Domestic transaction"),
+        ("Negative Balance", 0.25, user["is_negative_balance_after"] == 1, "Ends in negative balance", "Balance is sufficient"),
+        ("Short Duration", 0.25, user["transaction_duration"] <= 2, "Suspiciously fast transaction", "Normal duration"),
+        ("Young Age", 0.25, user["customer_age"] < 24, "Very young customer", "Customer age is mature")
+    ]
+
+    rating = 0
+    for _, weight, condition, _, _ in score_factors:
+        impact = weight if condition else -weight
+        rating += impact
+        rating = max(0, min(5, rating))  # Clamp after each impact
+
+    return round(rating, 2)
 
 def send_email_alert(to_email, subject, message):
     try:
@@ -221,8 +227,8 @@ if submitted:
         ("Young Age", +0.25 if user_input["customer_age"] < 24 else -0.25, "Very young customer" if user_input["customer_age"] < 24 else "Customer age is mature")
     ]
 
-    # Compute new rating directly from the same scoring logic
-    rating = max(0, min(5, round(sum(impact for _, impact, _ in score_factors), 2)))
+    # 1. Compute behavioral risk rating
+    rating = compute_behavioral_risk_score(user_input)
 
     # 2. Compute confidence score from rating
     confidence_score = calculate_confidence_from_rating(rating)
@@ -289,27 +295,15 @@ if st.session_state.submitted:
         ("Young Age", 0.25, user["customer_age"] < 24, "Very young customer", "Customer age is mature")
     ]
 
-    rating = 0
-    score_factors_display = []
+    rating = d['behavior_rating']  # Already calculated during form submit
 
     for factor, weight, condition, pos_desc, neg_desc in score_factors:
         impact = weight if condition else -weight
         reason = pos_desc if condition else neg_desc
         sign = "+" if impact > 0 else "–"
-    
-        # Accumulate only within the allowed [0, 5] range
-        rating += impact
-        rating = max(0, min(5, rating))  # Clamp rating after every step
-
-        score_factors_display.append(f"- **{factor}**: {sign}{abs(weight)} → _{reason}_")
-
-    # Display all individual scores
-    for line in score_factors_display:
-        st.markdown(line)
+        st.markdown(f"- **{factor}**: {sign}{abs(weight)} → _{reason}_")
 
     st.markdown(f"**Total Behavioral Risk Rating: {rating} / 5**")
-
-    st.session_state.result_data['behavior_rating'] = rating
 
     if rating >= 4.0:
         summary = "This transaction shows multiple high-risk traits. Please investigate urgently."
@@ -359,6 +353,7 @@ if st.session_state.submitted:
 
     heatmap_df = pd.DataFrame(heatmap_data, columns=["Feature", "RiskScore", "Label"]).set_index("Feature")
     heatmap_df["Explanation"] = annotations
+    heatmap_df = heatmap_df.reindex(heatmap_df['RiskScore'].abs().sort_values(ascending=False).index)  # Sort biggest impact on top
 
     fig, ax = plt.subplots(figsize=(10, 6))
     sns.heatmap(
