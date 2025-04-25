@@ -102,53 +102,19 @@ def calculate_confidence_from_rating(score):
     return round(confidence, 2)
 
 def compute_behavioral_risk_score(user):
-    score = 0
-    if user["account_age_days"] < 90:
-        score += 1.0
-    else:
-        score -= 1.0
-
-    if user["login_attempts"] > 3:
-        score += 0.5
-    else:
-        score -= 0.5
-
-    if user["transaction_amount"] > 10000:
-        score += 1.0
-    else:
-        score -= 1.0
-
-    if user["is_late_night"] == 1:
-        score += 0.5
-    else:
-        score -= 0.5
-
-    if user["transaction_method"] in ["Online", "Mobile", "Wire"]:
-        score += 0.5
-    else:
-        score -= 0.5
-
-    if user["is_international"] == "Yes":
-        score += 0.5
-    else:
-        score -= 0.5
-
-    if user["is_negative_balance_after"] == 1:
-        score += 0.5
-    else:
-        score -= 0.5
-
-    if user["transaction_duration"] <= 2:
-        score += 0.5
-    else:
-        score -= 0.5
-
-    if user["customer_age"] < 24:
-        score += 0.5
-    else:
-        score -= 0.5
-
-    return max(0, min(5, round(score, 2)))
+    score_factors = [
+        ("Account Age", +1.0 if user["account_age_days"] < 90 else -1.0),
+        ("Login Attempts", +0.5 if user["login_attempts"] > 3 else -0.5),
+        ("Transaction Amount", +1.0 if user["transaction_amount"] > 10000 else -1.0),
+        ("Time of Day", +0.5 if user["is_late_night"] == 1 else -0.5),
+        ("Method", +0.5 if user["transaction_method"] in ["Online", "Mobile", "Wire"] else -0.5),
+        ("International", +0.5 if user["is_international"] == "Yes" else -0.5),
+        ("Negative Balance", +0.5 if user["is_negative_balance_after"] == 1 else -0.5),
+        ("Short Duration", +0.5 if user["transaction_duration"] <= 2 else -0.5),
+        ("Young Age", +0.5 if user["customer_age"] < 24 else -0.5)
+    ]
+    total_score = sum(score for _, score in score_factors)
+    return max(0, min(5, round(total_score, 2)))
 
 def send_email_alert(to_email, subject, message):
     try:
