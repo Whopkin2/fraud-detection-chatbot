@@ -210,16 +210,17 @@ if submitted:
 
     # 1. Compute behavioral risk rating
     score_factors = [
-        score_factors.append(("Account Age", +1.0 if user_input["account_age_days"] < 90 else -1.0, "Account is new" if user_input["account_age_days"] < 90 else "Account is established"))
-        score_factors.append(("Login Attempts", +0.75 if user_input["login_attempts"] > 3 else -0.75, "Too many login attempts" if user_input["login_attempts"] > 3 else "Login count is normal"))
-        score_factors.append(("Transaction Amount", +1.0 if user_input["transaction_amount"] > 10000 else -1.0, "Large transaction amount" if user_input["transaction_amount"] > 10000 else "Amount is modest"))
-        score_factors.append(("Time of Day", +0.5 if user_input["is_late_night"] == 1 else -0.5, "Suspicious late-night timing" if user_input["is_late_night"] == 1 else "Normal hours"))
-        score_factors.append(("Method", +0.25 if user_input["transaction_method"] in ["Online", "Mobile", "Wire"] else -0.25, "Remote transaction method" if user_input["transaction_method"] in ["Online", "Mobile", "Wire"] else "In-person method"))
-        score_factors.append(("International", +0.75 if user_input["is_international"] == "Yes" else -0.75, "International transaction" if user_input["is_international"] == "Yes" else "Domestic transaction"))
-        score_factors.append(("Negative Balance", +0.25 if user_input["is_negative_balance_after"] == 1 else -0.25, "Ends in negative balance" if user_input["is_negative_balance_after"] == 1 else "Balance is sufficient"))
-        score_factors.append(("Short Duration", +0.25 if user_input["transaction_duration"] <= 2 else -0.25, "Suspiciously fast transaction" if user_input["transaction_duration"] <= 2 else "Normal duration"))
-        score_factors.append(("Young Age", +0.25 if user_input["customer_age"] < 24 else -0.25, "Very young customer" if user_input["customer_age"] < 24 else "Customer age is mature"))
+        ("Account Age", +1.0 if user_input["account_age_days"] < 90 else -1.0, "Account is new" if user_input["account_age_days"] < 90 else "Account is established"),
+        ("Login Attempts", +0.75 if user_input["login_attempts"] > 3 else -0.75, "Too many login attempts" if user_input["login_attempts"] > 3 else "Login count is normal"),
+        ("Transaction Amount", +1.0 if user_input["transaction_amount"] > 10000 else -1.0, "Large transaction amount" if user_input["transaction_amount"] > 10000 else "Amount is modest"),
+        ("Time of Day", +0.5 if user_input["is_late_night"] == 1 else -0.5, "Suspicious late-night timing" if user_input["is_late_night"] == 1 else "Normal hours"),
+        ("Method", +0.25 if user_input["transaction_method"] in ["Online", "Mobile", "Wire"] else -0.25, "Remote transaction method" if user_input["transaction_method"] in ["Online", "Mobile", "Wire"] else "In-person method"),
+        ("International", +0.75 if user_input["is_international"] == "Yes" else -0.75, "International transaction" if user_input["is_international"] == "Yes" else "Domestic transaction"),
+        ("Negative Balance", +0.25 if user_input["is_negative_balance_after"] == 1 else -0.25, "Ends in negative balance" if user_input["is_negative_balance_after"] == 1 else "Balance is sufficient"),
+        ("Short Duration", +0.25 if user_input["transaction_duration"] <= 2 else -0.25, "Suspiciously fast transaction" if user_input["transaction_duration"] <= 2 else "Normal duration"),
+        ("Young Age", +0.25 if user_input["customer_age"] < 24 else -0.25, "Very young customer" if user_input["customer_age"] < 24 else "Customer age is mature")
     ]
+
     # Compute new rating directly from the same scoring logic
     rating = max(0, min(5, round(sum(impact for _, impact, _ in score_factors), 2)))
 
@@ -234,7 +235,6 @@ if submitted:
         result = "Not Fraudulent"
     else:
         result = "Fraudulent" if prediction == -1 else "Not Fraudulent"
-
 
     # 4. Generate GPT explanation
     explanation_prompt = f"""
