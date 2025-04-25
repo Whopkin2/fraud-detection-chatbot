@@ -301,6 +301,12 @@ if st.session_state.submitted:
     user = d['user_input']
     score_factors = []
 
+    score_factors.append(("Young Age", +0.5 if user["customer_age"] < 24 else -0.5, "Very young customer" if user["customer_age"] < 24 else "Customer age is mature"))
+
+    # 🔁 FIXED: Calculate actual score from above factors
+    real_score_total = sum(impact for _, impact, _ in score_factors)
+    real_score_total = max(0, min(5, round(real_score_total, 2)))
+
     score_factors.append(("Account Age", +1.0 if user["account_age_days"] < 90 else -1.0, "Account is new" if user["account_age_days"] < 90 else "Account is established"))
     score_factors.append(("Login Attempts", +0.5 if user["login_attempts"] > 3 else -0.5, "Too many login attempts" if user["login_attempts"] > 3 else "Login count is normal"))
     score_factors.append(("Transaction Amount", +1.0 if user["transaction_amount"] > 10000 else -1.0, "Large transaction amount" if user["transaction_amount"] > 10000 else "Amount is modest"))
@@ -311,7 +317,7 @@ if st.session_state.submitted:
     score_factors.append(("Short Duration", +0.5 if user["transaction_duration"] <= 2 else -0.5, "Suspiciously fast transaction" if user["transaction_duration"] <= 2 else "Normal duration"))
     score_factors.append(("Young Age", +0.5 if user["customer_age"] < 24 else -0.5, "Very young customer" if user["customer_age"] < 24 else "Customer age is mature"))
 
-    st.markdown(f"**Total Behavioral Risk Rating: {score} / 5**")
+    st.markdown(f"**Total Behavioral Risk Rating: {real_score_total} / 5**")
     for factor, impact, reason in score_factors:
         sign = "+" if impact > 0 else "–"
         st.markdown(f"- **{factor}**: {sign}{abs(impact)} → _{reason}_")
