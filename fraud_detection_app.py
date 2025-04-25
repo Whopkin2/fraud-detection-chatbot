@@ -108,8 +108,8 @@ def compute_behavioral_risk_score(user):
         ("Transaction Amount", 1.0, user["transaction_amount"] > 10000, "Large transaction amount", "Amount is modest"),
         ("Time of Day", 0.5, user["is_late_night"] == 1, "Suspicious late-night timing", "Normal hours"),
         ("Method", 0.25, user["transaction_method"] in ["Online", "Mobile", "Wire"], "Remote transaction method", "In-person method"),
-        ("International", 0.75, user["is_international"] == "Yes", "International transaction", "Domestic transaction"),
-        ("Negative Balance", 0.25, user["is_negative_balance_after"] == 1, "Ends in negative balance", "Balance is sufficient"),
+        ("International", 0.5, user["is_international"] == "Yes", "International transaction", "Domestic transaction"),
+        ("Negative Balance", 0.5, user["is_negative_balance_after"] == 1, "Ends in negative balance", "Balance is sufficient"),
         ("Short Duration", 0.25, user["transaction_duration"] <= 2, "Suspiciously fast transaction", "Normal duration"),
         ("Young Age", 0.25, user["customer_age"] < 24, "Very young customer", "Customer age is mature")
     ]
@@ -221,8 +221,8 @@ if submitted:
         ("Transaction Amount", +1.0 if user_input["transaction_amount"] > 10000 else -1.0, "Large transaction amount" if user_input["transaction_amount"] > 10000 else "Amount is modest"),
         ("Time of Day", +0.5 if user_input["is_late_night"] == 1 else -0.5, "Suspicious late-night timing" if user_input["is_late_night"] == 1 else "Normal hours"),
         ("Method", +0.25 if user_input["transaction_method"] in ["Online", "Mobile", "Wire"] else -0.25, "Remote transaction method" if user_input["transaction_method"] in ["Online", "Mobile", "Wire"] else "In-person method"),
-        ("International", +0.75 if user_input["is_international"] == "Yes" else -0.75, "International transaction" if user_input["is_international"] == "Yes" else "Domestic transaction"),
-        ("Negative Balance", +0.25 if user_input["is_negative_balance_after"] == 1 else -0.25, "Ends in negative balance" if user_input["is_negative_balance_after"] == 1 else "Balance is sufficient"),
+        ("International", +0.5 if user_input["is_international"] == "Yes" else -0.5, "International transaction" if user_input["is_international"] == "Yes" else "Domestic transaction"),
+        ("Negative Balance", +0.5 if user_input["is_negative_balance_after"] == 1 else -0.5, "Ends in negative balance" if user_input["is_negative_balance_after"] == 1 else "Balance is sufficient"),
         ("Short Duration", +0.25 if user_input["transaction_duration"] <= 2 else -0.25, "Suspiciously fast transaction" if user_input["transaction_duration"] <= 2 else "Normal duration"),
         ("Young Age", +0.25 if user_input["customer_age"] < 24 else -0.25, "Very young customer" if user_input["customer_age"] < 24 else "Customer age is mature")
     ]
@@ -289,8 +289,8 @@ if st.session_state.submitted:
         ("Transaction Amount", 1.0, user["transaction_amount"] > 10000, "Large transaction amount", "Amount is modest"),
         ("Time of Day", 0.5, user["is_late_night"] == 1, "Suspicious late-night timing", "Normal hours"),
         ("Method", 0.25, user["transaction_method"] in ["Online", "Mobile", "Wire"], "Remote transaction method", "In-person method"),
-        ("International", 0.75, user["is_international"] == "Yes", "International transaction", "Domestic transaction"),
-        ("Negative Balance", 0.25, user["is_negative_balance_after"] == 1, "Ends in negative balance", "Balance is sufficient"),
+        ("International", 0.5, user["is_international"] == "Yes", "International transaction", "Domestic transaction"),
+        ("Negative Balance", 0.5, user["is_negative_balance_after"] == 1, "Ends in negative balance", "Balance is sufficient"),
         ("Short Duration", 0.25, user["transaction_duration"] <= 2, "Suspiciously fast transaction", "Normal duration"),
         ("Young Age", 0.25, user["customer_age"] < 24, "Very young customer", "Customer age is mature")
     ]
@@ -331,8 +331,8 @@ if st.session_state.submitted:
         "Transaction Amount": (user["transaction_amount"] > 10000, "+1.0", "Large transaction amount", "-1.0", "Amount is modest"),
         "Time of Day": (user["is_late_night"] == 1, "+0.5", "Suspicious late-night timing", "-0.5", "Normal hours"),
         "Method": (user["transaction_method"] in ["Online", "Mobile", "Wire"], "+0.25", "Remote transaction method", "-0.25", "In-person method"),
-        "International": (user["is_international"] == "Yes", "+0.75", "International transaction", "-0.75", "Domestic transaction"),
-        "Negative Balance": (user["is_negative_balance_after"] == 1, "+0.25", "Ends in negative balance", "-0.25", "Balance is sufficient"),
+        "International": (user["is_international"] == "Yes", "+0.5", "International transaction", "-0.5", "Domestic transaction"),
+        "Negative Balance": (user["is_negative_balance_after"] == 1, "+0.5", "Ends in negative balance", "-0.5", "Balance is sufficient"),
         "Short Duration": (user["transaction_duration"] <= 2, "+0.25", "Suspiciously fast transaction", "-0.25", "Normal duration"),
         "Young Age": (user["customer_age"] < 24, "+0.25", "Very young customer", "-0.25", "Customer age is mature")
     }
