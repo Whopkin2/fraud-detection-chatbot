@@ -290,14 +290,23 @@ if st.session_state.submitted:
     ]
 
     rating = 0
+    score_factors_display = []
+
     for factor, weight, condition, pos_desc, neg_desc in score_factors:
         impact = weight if condition else -weight
-        rating += impact
-        sign = "+" if impact > 0 else "–"
         reason = pos_desc if condition else neg_desc
-        st.markdown(f"- **{factor}**: {sign}{abs(weight)} → _{reason}_")
+        sign = "+" if impact > 0 else "–"
+    
+        # Accumulate only within the allowed [0, 5] range
+        rating += impact
+        rating = max(0, min(5, rating))  # Clamp rating after every step
 
-    rating = max(0, min(5, round(rating, 2)))
+        score_factors_display.append(f"- **{factor}**: {sign}{abs(weight)} → _{reason}_")
+
+    # Display all individual scores
+    for line in score_factors_display:
+        st.markdown(line)
+
     st.markdown(f"**Total Behavioral Risk Rating: {rating} / 5**")
 
     st.session_state.result_data['behavior_rating'] = rating
