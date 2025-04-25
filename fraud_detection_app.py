@@ -277,7 +277,7 @@ if st.session_state.submitted:
     st.markdown("<h3 style='font-family: Arial;'>🧠 Behavioral Risk Rating Breakdown</h3>", unsafe_allow_html=True)
     user = d['user_input']
 
-    # Unified scoring logic
+    # Unified score breakdown logic (used for both UI and scoring)
     score_factors = [
         ("Account Age", +1.0 if user["account_age_days"] < 90 else -1.0, "Account is new" if user["account_age_days"] < 90 else "Account is established"),
         ("Login Attempts", +0.5 if user["login_attempts"] > 3 else -0.5, "Too many login attempts" if user["login_attempts"] > 3 else "Login count is normal"),
@@ -290,8 +290,7 @@ if st.session_state.submitted:
         ("Young Age", +0.5 if user["customer_age"] < 24 else -0.5, "Very young customer" if user["customer_age"] < 24 else "Customer age is mature")
     ]
 
-    # True score (matches prediction logic)
-    rating = max(0, min(5, round(sum(impact for _, impact, _ in score_factors), 2)))
+    rating = max(0, min(5, round(sum(score for _, score, _ in score_factors), 2)))
 
     st.markdown(f"**Total Behavioral Risk Rating: {rating} / 5**")
     for factor, impact, reason in score_factors:
@@ -335,12 +334,12 @@ if st.session_state.submitted:
     summary_lines = []
 
     for feature, (condition, pos_score, pos_desc, neg_score, neg_desc) in risk_logic.items():
-        visual_score = 3.0 if condition else 1.0
+        score = 3.0 if condition else 1.0
         label = pos_score if condition else neg_score
         desc = pos_desc if condition else neg_desc
-        status = "🔴 High Risk" if visual_score == 3.0 else "🔵 Low Risk"
+        status = "🔴 High Risk" if score == 3.0 else "🔵 Low Risk"
 
-        heatmap_data.append((feature, visual_score, label))
+        heatmap_data.append((feature, score, label))
         annotations.append(desc)
         summary_lines.append(f"- **{feature}** → {desc} → **{label}** ({status})")
 
