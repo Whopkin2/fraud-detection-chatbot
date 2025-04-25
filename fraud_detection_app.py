@@ -303,7 +303,7 @@ if st.session_state.submitted:
 
     score_factors.append(("Account Age", +1.0 if user["account_age_days"] < 90 else -1.0, "Account is new" if user["account_age_days"] < 90 else "Account is established"))
     score_factors.append(("Login Attempts", +0.5 if user["login_attempts"] > 3 else -0.5, "Too many login attempts" if user["login_attempts"] > 3 else "Login count is normal"))
-    score_factors.append(("Transaction Amount", +1.0 if user["transaction_amount"] > 5000 else -1.0, "Large transaction amount" if user["transaction_amount"] > 5000 else "Amount is modest"))
+    score_factors.append(("Transaction Amount", +1.0 if user["transaction_amount"] > 10000 else -1.0, "Large transaction amount" if user["transaction_amount"] > 10000 else "Amount is modest"))
     score_factors.append(("Time of Day", +0.5 if user["is_late_night"] == 1 else -0.5, "Suspicious late-night timing" if user["is_late_night"] == 1 else "Normal hours"))
     score_factors.append(("Method", +0.5 if user["transaction_method"] in ["Online", "Mobile", "Wire"] else -0.5, "Remote transaction method" if user["transaction_method"] in ["Online", "Mobile", "Wire"] else "In-person method"))
     score_factors.append(("International", +0.5 if user["is_international"] == "Yes" else -0.5, "International transaction" if user["is_international"] == "Yes" else "Domestic transaction"))
