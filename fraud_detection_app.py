@@ -102,7 +102,7 @@ def calculate_confidence_from_rating(score):
     return round(confidence, 2)
 
 def compute_behavioral_risk_score(user):
-    score_factors = [
+    score_factors = []
     ("Account Age", 1.0, user["account_age_days"] < 90, "Account is new", "Account is established"),
     ("Login Attempts", 0.75, user["login_attempts"] > 3, "Too many login attempts", "Login count is normal"),
     ("Transaction Amount", 1.0, user["transaction_amount"] > 10000, "Large transaction amount", "Amount is modest"),
@@ -112,7 +112,7 @@ def compute_behavioral_risk_score(user):
     ("Negative Balance", 0.25, user["is_negative_balance_after"] == 1, "Ends in negative balance", "Balance is sufficient"),
     ("Short Duration", 0.25, user["transaction_duration"] <= 2, "Suspiciously fast transaction", "Normal duration"),
     ("Young Age", 0.25, user["customer_age"] < 24, "Very young customer", "Customer age is mature")
-    ]
+    
     total_score = sum(score for _, score in score_factors)
     return max(0, min(5, round(total_score, 2)))
 
