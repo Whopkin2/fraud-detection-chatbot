@@ -362,7 +362,7 @@ if st.session_state.submitted:
         cbar_kws={"label": "Fraud Likelihood Score"},
         ax=ax
     )
-    plt.title("Adjusted Anomaly Heatmap (Fraud Risk Based)", fontsize=14)
+    plt.title("Anomaly Heatmap", fontsize=14)
     st.pyplot(fig)
 
     st.markdown("<h3 style='font-family: Arial;'>📋 Heatmap Summary Explanation:</h3>", unsafe_allow_html=True)
