@@ -331,8 +331,8 @@ if st.session_state.submitted:
         "Transaction Amount": (user["transaction_amount"] > 10000, "+1.0", "Large transaction amount", "-1.0", "Amount is modest"),
         "Time of Day": (user["is_late_night"] == 1, "+0.5", "Suspicious late-night timing", "-0.5", "Normal hours"),
         "Method": (user["transaction_method"] in ["Online", "Mobile", "Wire"], "+0.25", "Remote transaction method", "-0.25", "In-person method"),
-        "International": (user["is_international"] == "Yes", "+0.75", "International transaction", "-0.5", "Domestic transaction"),
-        "Negative Balance": (user["is_negative_balance_after"] == 1, "+0.25", "Ends in negative balance", "-0.5", "Balance is sufficient"),
+        "International": (user["is_international"] == "Yes", "+0.75", "International transaction", "-0.75", "Domestic transaction"),
+        "Negative Balance": (user["is_negative_balance_after"] == 1, "+0.25", "Ends in negative balance", "-0.25", "Balance is sufficient"),
         "Short Duration": (user["transaction_duration"] <= 2, "+0.25", "Suspiciously fast transaction", "-0.25", "Normal duration"),
         "Young Age": (user["customer_age"] < 24, "+0.25", "Very young customer", "-0.25", "Customer age is mature")
     }
