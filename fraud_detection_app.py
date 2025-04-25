@@ -338,15 +338,15 @@ if st.session_state.submitted:
     annotations = []
     summary_lines = []
 
-    for feature, (condition, pos_score, pos_desc, neg_score, neg_desc) in risk_logic.items():
-        score = float(pos_score.strip('+')) if condition else float(neg_score.strip('-'))
-        label = pos_score if condition else neg_score
+    for factor, weight, condition, pos_desc, neg_desc in score_factors:
+        impact = weight if condition else -weight
+        sign = "+" if impact > 0 else "–"
         desc = pos_desc if condition else neg_desc
-        status = "🔴 High Risk" if score > 3.0 else "🔵 Low Risk"
+        status = "🔴 High Risk" if impact > 0 else "🔵 Low Risk"
 
-        heatmap_data.append((feature, score, label))
+        heatmap_data.append((factor, impact, f"{sign}{abs(weight)}"))
         annotations.append(desc)
-        summary_lines.append(f"- **{feature}** → {desc} → **{label}** ({status})")
+        summary_lines.append(f"- **{factor}** → {desc} → **{sign}{abs(weight)}** ({status})")
 
     heatmap_df = pd.DataFrame(heatmap_data, columns=["Feature", "RiskScore", "Label"]).set_index("Feature")
     heatmap_df["Explanation"] = annotations
@@ -356,8 +356,8 @@ if st.session_state.submitted:
         heatmap_df[["RiskScore"]],
         annot=heatmap_df[["Label"]],
         fmt="",
-        cmap="RdBu_r",
-        center=0,
+        cmap="RdBu_r",   # Red-Blue reversed
+        center=0,        # Center at 0
         linewidths=0.5,
         cbar_kws={"label": "Fraud Likelihood Score"},
         ax=ax
